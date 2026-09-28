@@ -1,8 +1,8 @@
-# AeGO Flash 1.0.1
+# AeGO Flash 1.0.2
 
 在 After Effects 时间线上导入、预览和渲染 Live2D 角色。动作与表情以独立片段编辑，支持声音口型、呼吸、眨眼和多帧渲染。
 
-本次更新修复 AE 2024／2025 重启后效果控件的中文乱码，让初次加载与缓存加载采用一致的编码判定。导入窗口、渲染和工程标识保持不变。
+界面跟随 After Effects 的语言：简体中文显示中文，其他语言显示英文。1.0.1 的宿主版本与语言探测仍然有效，AE 2024／2025 重启后的编码判定保持不变。导入窗口、渲染和工程标识保持不变。
 
 适用于 Windows x64，目标宿主为 AE 2022 及以后版本，需要支持 Direct3D 11 的显卡。修复尚未在 AE 2022／2024／2025 实机验收；AE 2026 本发行包也仍待安装验证。
 
@@ -10,7 +10,7 @@
 
 1. 保存工程副本并关闭 AE。
 2. 如已安装 `AeGOFlash`，先备份原文件夹再完整替换。如果插件目录中还有 `Live2DNativeAE` 文件夹，将它移出 `Plug-ins` 备份，避免同一效果重复加载。
-3. 解压 `AeGOFlash-1.0.1-Windows-x64.zip`，把整个 `AeGOFlash` 文件夹复制到 AE 的 `Support Files/Plug-ins/`，例如：
+3. 解压 `AeGOFlash-1.0.2-Windows-x64.zip`，把整个 `AeGOFlash` 文件夹复制到 AE 的 `Support Files/Plug-ins/`，例如：
 
    `C:\Program Files\Adobe\Adobe After Effects 2026\Support Files\Plug-ins\AeGOFlash\`
 
@@ -52,7 +52,7 @@
 
 ## 源码与许可
 
-源码包为 `AeGOFlash-1.0.1-source.zip`，另附验证范围及性能机制说明。构建需要 Windows x64、Visual Studio 2022 C++ v143、Windows SDK、CMake、Adobe After Effects C++ SDK 和 Cubism SDK for Native 5-r.5。
+源码包为 `AeGOFlash-1.0.2-source.zip`，另附验证范围及性能机制说明。构建需要 Windows x64、Visual Studio 2022 C++ v143、Windows SDK、CMake、Adobe After Effects C++ SDK 和 Cubism SDK for Native 5-r.5。
 
 ```powershell
 .\tools\Build.ps1 -AeSdk 'D:\SDK\AfterEffectsSDK' -CubismSdk 'D:\SDK\CubismSdkForNative-5-r.5'

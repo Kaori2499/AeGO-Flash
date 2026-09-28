@@ -139,10 +139,15 @@ bool browseFile(HWND owner, bool model, std::wstring& path, bool expression = fa
     ofn.lpstrFile = buffer.data();
     ofn.nMaxFile = static_cast<DWORD>(buffer.size());
     ofn.lpstrFilter = model
-        ? L"Live2D 模型 (*.model3.json)\0*.model3.json\0\0"
-        : expression ? L"Live2D 表情 (*.exp3.json)\0*.exp3.json\0\0"
-        : L"Live2D 动作 (*.motion3.json)\0*.motion3.json\0\0";
-    ofn.lpstrTitle = model ? L"AeGO Flash — 导入模型" : expression ? L"AeGO Flash — 选择外部表情" : L"AeGO Flash — 选择外部动作";
+        ? uiText(L"Live2D model (*.model3.json)\0*.model3.json\0\0",
+            L"Live2D 模型 (*.model3.json)\0*.model3.json\0\0")
+        : expression ? uiText(L"Live2D expression (*.exp3.json)\0*.exp3.json\0\0",
+            L"Live2D 表情 (*.exp3.json)\0*.exp3.json\0\0")
+        : uiText(L"Live2D motion (*.motion3.json)\0*.motion3.json\0\0",
+            L"Live2D 动作 (*.motion3.json)\0*.motion3.json\0\0");
+    ofn.lpstrTitle = model ? uiText(L"AeGO Flash - Import Model", L"AeGO Flash — 导入模型")
+        : expression ? uiText(L"AeGO Flash - External Expression", L"AeGO Flash — 选择外部表情")
+        : uiText(L"AeGO Flash - External Motion", L"AeGO Flash — 选择外部动作");
     ofn.Flags = OFN_FILEMUSTEXIST | OFN_PATHMUSTEXIST | OFN_EXPLORER | OFN_NOCHANGEDIR;
     if (!GetOpenFileNameW(&ofn)) {
         const auto code = CommDlgExtendedError();
@@ -232,7 +237,7 @@ private:
             Library library;
             try { library.motions = listMotions(model); library.expressions = listExpressions(model); }
             catch (const std::exception& e) { library.error = fromUtf8(e.what()); }
-            catch (...) { library.error = L"模型文件无法读取。"; }
+            catch (...) { library.error = uiText(L"The model file could not be read.", L"模型文件无法读取。"); }
             { std::lock_guard<std::mutex> lock(mutex_);
               if (stopping_) return;
               library_ = std::move(library); hasLibrary_ = true; }
@@ -294,7 +299,7 @@ private:
                         result.bgra[offset + 3] = 255;
                     }
                 } catch (const std::exception& e) { result.error = fromUtf8(e.what()); }
-                  catch (...) { result.error = L"预览暂时不可用。"; }
+                  catch (...) { result.error = uiText(L"Preview is temporarily unavailable.", L"预览暂时不可用。"); }
                 { std::lock_guard<std::mutex> lock(mutex_);
                   if (stopping_) return;
                   if (generation == generation_) { result_ = std::move(result); hasResult_ = true; } }
@@ -375,8 +380,8 @@ void addKnownPaths(PickerList& list, const std::vector<std::wstring>& bank) {
 }
 
 void updateSummary(HWND window, const DialogState& state) {
-    SetDlgItemTextW(window, kMotionPath, state.motions.selected.empty() ? L"未选择动作" : animationName(state.motions.selected).c_str());
-    SetDlgItemTextW(window, kExpressionPath, state.expressions.selected.empty() ? L"未选择表情" : animationName(state.expressions.selected).c_str());
+    SetDlgItemTextW(window, kMotionPath, state.motions.selected.empty() ? uiText(L"No motion", L"未选择动作") : animationName(state.motions.selected).c_str());
+    SetDlgItemTextW(window, kExpressionPath, state.expressions.selected.empty() ? uiText(L"No expression", L"未选择表情") : animationName(state.expressions.selected).c_str());
     const bool any = !state.motions.selected.empty() || !state.expressions.selected.empty();
     EnableWindow(GetDlgItem(window, IDOK), state.modelValid && any);
     for (const int id : {kBounceNone, kBounceGentle, kBounceStrong}) {
@@ -384,9 +389,9 @@ void updateSummary(HWND window, const DialogState& state) {
         EnableWindow(control, state.modelValid && !state.motions.selected.empty());
         InvalidateRect(control, nullptr, FALSE);
     }
-    const auto summary = !any ? L"选择动作或表情，即可预览并导入。" :
-        !state.motions.selected.empty() && !state.expressions.selected.empty() ? L"将添加 1 个动作片段和 1 个表情片段" :
-        !state.motions.selected.empty() ? L"将添加 1 个动作片段" : L"将添加 1 个表情片段";
+    const auto summary = !any ? uiText(L"Choose a motion or expression to preview and import.", L"选择动作或表情，即可预览并导入。") :
+        !state.motions.selected.empty() && !state.expressions.selected.empty() ? uiText(L"Adds 1 motion clip and 1 expression clip", L"将添加 1 个动作片段和 1 个表情片段") :
+        !state.motions.selected.empty() ? uiText(L"Adds 1 motion clip", L"将添加 1 个动作片段") : uiText(L"Adds 1 expression clip", L"将添加 1 个表情片段");
     SetDlgItemTextW(window, kImportSummary, summary);
 }
 
@@ -400,7 +405,7 @@ void rebuildList(HWND window, DialogState& state, PickerList& list) {
     } guard(control, state.rebuilding);
     SendMessageW(control, LB_RESETCONTENT, 0, 0);
     list.visible.clear();
-    const wchar_t* none = list.expression ? L"（不导入表情）" : L"（不导入动作）";
+    const wchar_t* none = list.expression ? uiText(L"(Skip expression)", L"（不导入表情）") : uiText(L"(Skip motion)", L"（不导入动作）");
     if (SendMessageW(control, LB_ADDSTRING, 0, reinterpret_cast<LPARAM>(none)) != 0)
         throw std::runtime_error("Cannot populate the animation list.");
     int selected = list.selected.empty() ? 0 : -1;
@@ -414,7 +419,7 @@ void rebuildList(HWND window, DialogState& state, PickerList& list) {
         if (entry.path == list.selected) selected = static_cast<int>(row);
     }
     SendMessageW(control, LB_SETCURSEL, selected, 0);
-    const auto count = std::to_wstring(list.visible.size()) + (list.query.empty() ? L" 项" : L" / " + std::to_wstring(list.entries.size()));
+    const auto count = std::to_wstring(list.visible.size()) + (list.query.empty() ? std::wstring(uiText(L" items", L" 项")) : L" / " + std::to_wstring(list.entries.size()));
     SetDlgItemTextW(window, list.expression ? kExpressionCount : kMotionCount, count.c_str());
     updateSummary(window, state);
 }
@@ -477,7 +482,7 @@ void selectionChanged(HWND window, DialogState& state) {
     state.frame = {};
     InvalidateRect(GetDlgItem(window, kPreview), nullptr, FALSE);
     updateSummary(window, state);
-    SetDlgItemTextW(window, kStatus, L"正在更新预览…");
+    SetDlgItemTextW(window, kStatus, uiText(L"Updating preview...", L"正在更新预览…"));
 }
 
 void submitPreview(DialogState& state) {
@@ -514,7 +519,7 @@ void tick(HWND window, DialogState& state) {
             rebuildList(window, state, state.expressions);
         } else {
             state.playing = false;
-            SetDlgItemTextW(window, kPlay, L"播放");
+            SetDlgItemTextW(window, kPlay, uiText(L"Play", L"播放"));
             SetDlgItemTextW(window, kStatus, library.error.c_str());
         }
     }
@@ -524,11 +529,11 @@ void tick(HWND window, DialogState& state) {
             state.duration = frame.duration;
             state.frame = std::move(frame);
             InvalidateRect(GetDlgItem(window, kPreview), nullptr, FALSE);
-            SetDlgItemTextW(window, kStatus, L"循环预览 · 拖动进度可查看任意时刻");
+            SetDlgItemTextW(window, kStatus, uiText(L"Looping preview. Drag the slider to any moment.", L"循环预览 · 拖动进度可查看任意时刻"));
         } else {
             state.playing = false;
-            SetDlgItemTextW(window, kPlay, L"播放");
-            SetDlgItemTextW(window, kStatus, (L"预览失败：" + frame.error).c_str());
+            SetDlgItemTextW(window, kPlay, uiText(L"Play", L"播放"));
+            SetDlgItemTextW(window, kStatus, (std::wstring(uiText(L"Preview failed: ", L"预览失败：")) + frame.error).c_str());
         }
     }
     const auto now = GetTickCount64();
@@ -539,7 +544,7 @@ void tick(HWND window, DialogState& state) {
     state.lastTick = now;
     InvalidateRect(GetDlgItem(window, kScrub), nullptr, FALSE);
     wchar_t time[64]{};
-    swprintf_s(time, L"%.2f / %.2f 秒", state.seconds, state.duration);
+    swprintf_s(time, simplifiedChineseUi() ? L"%.2f / %.2f 秒" : L"%.2f / %.2f s", state.seconds, state.duration);
     SetDlgItemTextW(window, kTime, time);
     if (state.previewEnabled && state.previewDirty) submitPreview(state);
 }
@@ -709,59 +714,59 @@ void initialize(HWND window, DialogState& state) {
         const auto original = reinterpret_cast<WNDPROC>(SetWindowLongPtrW(c, GWLP_WNDPROC, reinterpret_cast<LONG_PTR>(buttonProcedure)));
         SetPropW(c, L"Live2DOriginalButtonProc", reinterpret_cast<HANDLE>(original)); return c;
     };
-    auto heading = label(L"导入动作与表情", 24, 22, 600, 38, kHeading);
+    auto heading = label(uiText(L"Import Motions & Expressions", L"导入动作与表情"), 24, 22, 600, 38, kHeading);
     SendMessageW(heading, WM_SETFONT, reinterpret_cast<WPARAM>(state.titleFont), TRUE);
-    label(L"选好动作与表情，预览后一起添加到时间线。", 26, 67, 720, 24, kSubtitle);
+    label(uiText(L"Choose a motion and expression, preview them, then add both to the timeline.", L"选好动作与表情，预览后一起添加到时间线。"), 26, 67, 720, 24, kSubtitle);
     auto modelName = animationName(state.pending.modelPath);
     if (hasSuffix(modelName, L".model3.json")) modelName.resize(modelName.size() - 12);
-    label((L"当前模型  ·  " + modelName).c_str(), 708, 37, 308, 28, kModelPath);
+    label((std::wstring(uiText(L"Current model  ·  ", L"当前模型  ·  ")) + modelName).c_str(), 708, 37, 308, 28, kModelPath);
     for (const bool expression : {false, true}) {
         auto& list = expression ? state.expressions : state.motions;
         const int x = expression ? 294 : 24;
-        auto title = label(expression ? L"表情" : L"动作", x + 16, 122, 124, 28);
+        auto title = label(expression ? uiText(L"Expression", L"表情") : uiText(L"Motion", L"动作"), x + 16, 122, 124, 28);
         SendMessageW(title, WM_SETFONT, reinterpret_cast<WPARAM>(state.boldFont), TRUE);
-        label(L"加载中", x + 152, 126, 90, 22, expression ? kExpressionCount : kMotionCount, true);
-        label(L"搜索", x + 21, 168, 36, 22, expression ? kExpressionSearchHint : kMotionSearchHint, true);
+        label(uiText(L"Loading", L"加载中"), x + 152, 126, 90, 22, expression ? kExpressionCount : kMotionCount, true);
+        label(uiText(L"Search", L"搜索"), x + 16, 168, 62, 22, expression ? kExpressionSearchHint : kMotionSearchHint, true);
         auto search = addControl(window, state, L"EDIT", L"", ES_AUTOHSCROLL | WS_TABSTOP,
-            0, x + 62, 166, 178, 28, list.searchId);
-        SendMessageW(search, EM_SETCUEBANNER, TRUE, reinterpret_cast<LPARAM>(expression ? L"搜索表情…" : L"搜索动作…"));
+            0, x + 80, 166, 160, 28, list.searchId);
+        SendMessageW(search, EM_SETCUEBANNER, TRUE, reinterpret_cast<LPARAM>(expression ? uiText(L"Search expressions...", L"搜索表情…") : uiText(L"Search motions...", L"搜索动作…")));
         SendMessageW(search, EM_SETLIMITTEXT, 1024, 0);
         const auto listControl = addControl(window, state, L"LISTBOX", L"", LBS_NOTIFY | LBS_NOINTEGRALHEIGHT |
             LBS_OWNERDRAWFIXED | LBS_HASSTRINGS | WS_VSCROLL | WS_TABSTOP, 0, x + 12, 204, 234, 158, list.listId);
         SendMessageW(listControl, LB_SETITEMHEIGHT, 0, px(32));
-        button(expression ? L"＋ 外部表情文件" : L"＋ 外部动作文件", x + 16, 372, 226, 30,
+        button(expression ? uiText(L"+ Expression File", L"＋ 外部表情文件") : uiText(L"+ Motion File", L"＋ 外部动作文件"), x + 16, 372, 226, 30,
             expression ? kBrowseExpression : kBrowseMotion);
-        label(L"已选", x + 16, 413, 36, 22, 0, true);
-        label(expression ? L"未选择表情" : L"未选择动作", x + 54, 411, 190, 24, list.pathId);
+        label(uiText(L"Selected", L"已选"), x + 16, 413, 70, 22, 0, true);
+        label(expression ? uiText(L"No expression", L"未选择表情") : uiText(L"No motion", L"未选择动作"), x + 88, 411, 156, 24, list.pathId);
     }
-    auto previewTitle = label(L"实时预览", 592, 124, 190, 26);
+    auto previewTitle = label(uiText(L"Live Preview", L"实时预览"), 592, 124, 190, 26);
     SendMessageW(previewTitle, WM_SETFONT, reinterpret_cast<WPARAM>(state.boldFont), TRUE);
-    button(L"半身", 834, 118, 78, 32, kUpperBody);
-    button(L"全身", 918, 118, 78, 32, kFullBody);
+    button(uiText(L"Half", L"半身"), 834, 118, 78, 32, kUpperBody);
+    button(uiText(L"Full", L"全身"), 918, 118, 78, 32, kFullBody);
     addControl(window, state, L"STATIC", L"", SS_OWNERDRAW, 0, 592, 158, 406, 400, kPreview);
-    button(L"暂停", 592, 572, 66, 30, kPlay);
-    const auto scrub = addControl(window, state, L"STATIC", L"", SS_OWNERDRAW | SS_NOTIFY | WS_TABSTOP, 0, 672, 575, 204, 26, kScrub);
+    button(uiText(L"Pause", L"暂停"), 592, 572, 76, 30, kPlay);
+    const auto scrub = addControl(window, state, L"STATIC", L"", SS_OWNERDRAW | SS_NOTIFY | WS_TABSTOP, 0, 676, 575, 200, 26, kScrub);
     const auto originalScrub = reinterpret_cast<WNDPROC>(SetWindowLongPtrW(scrub, GWLP_WNDPROC, reinterpret_cast<LONG_PTR>(buttonProcedure)));
     SetPropW(scrub, L"Live2DOriginalButtonProc", reinterpret_cast<HANDLE>(originalScrub));
-    label(L"0.00 / 3.00 秒", 888, 576, 114, 24, kTime, true);
-    label(L"正在加载预览，首次加载需要数秒…", 576, 625, 440, 22, kStatus, true);
-    label(L"过渡时长", 40, 470, 166, 20, kTransitionTitle);
+    label(uiText(L"0.00 / 3.00 s", L"0.00 / 3.00 秒"), 888, 576, 114, 24, kTime, true);
+    label(uiText(L"Loading preview. The first load can take a few seconds...", L"正在加载预览，首次加载需要数秒…"), 576, 625, 440, 22, kStatus, true);
+    label(uiText(L"Transition", L"过渡时长"), 40, 470, 166, 20, kTransitionTitle);
     // The edit sits centered inside a 32px visual field, matching the buttons.
     // A single-line native edit has no vertical-alignment option of its own.
     auto edit = addControl(window, state, L"EDIT", std::to_wstring(state.transitionFrames).c_str(),
-        ES_NUMBER | ES_CENTER | ES_AUTOHSCROLL | WS_TABSTOP, 0, 46, 502, 110, 20, kTransition);
+        ES_NUMBER | ES_CENTER | ES_AUTOHSCROLL | WS_TABSTOP, 0, 46, 502, 78, 20, kTransition);
     SendMessageW(edit, EM_SETLIMITTEXT, 6, 0);
-    addControl(window, state, L"STATIC", L"帧", SS_CENTERIMAGE, 0, 174, 496, 32, 32, kTransitionUnit);
-    label(L"回弹幅度", 250, 470, 286, 20, kBounceTitle);
-    button(L"无", 250, 496, 90, 32, kBounceNone);
-    button(L"轻柔", 348, 496, 90, 32, kBounceGentle);
-    button(L"明显", 446, 496, 90, 32, kBounceStrong);
-    label(L"添加位置", 40, 560, 496, 20, kPlacementTitle);
-    button(L"接在上一动作后", 40, 586, 242, 32, kAppendClip);
-    button(L"从当前时间开始", 294, 586, 242, 32, kAtPlayhead);
-    label(L"选择动作或表情，即可预览并导入。", 26, 663, 640, 24, kImportSummary, true);
-    button(L"取消", 706, 651, 94, 36, IDCANCEL);
-    button(L"添加到时间线", 814, 651, 202, 36, IDOK);
+    addControl(window, state, L"STATIC", uiText(L"frames", L"帧"), SS_CENTERIMAGE, 0, 128, 496, 78, 32, kTransitionUnit);
+    label(uiText(L"Overshoot", L"回弹幅度"), 250, 470, 286, 20, kBounceTitle);
+    button(uiText(L"None", L"无"), 250, 496, 90, 32, kBounceNone);
+    button(uiText(L"Soft", L"轻柔"), 348, 496, 90, 32, kBounceGentle);
+    button(uiText(L"Strong", L"明显"), 446, 496, 90, 32, kBounceStrong);
+    label(uiText(L"Placement", L"添加位置"), 40, 560, 496, 20, kPlacementTitle);
+    button(uiText(L"After Previous Clip", L"接在上一动作后"), 40, 586, 242, 32, kAppendClip);
+    button(uiText(L"At Current Time", L"从当前时间开始"), 294, 586, 242, 32, kAtPlayhead);
+    label(uiText(L"Choose a motion or expression to preview and import.", L"选择动作或表情，即可预览并导入。"), 26, 663, 640, 24, kImportSummary, true);
+    button(uiText(L"Cancel", L"取消"), 706, 651, 94, 36, IDCANCEL);
+    button(uiText(L"Add to Timeline", L"添加到时间线"), 814, 651, 202, 36, IDOK);
     SendMessageW(window, DM_SETDEFID, IDOK, 0);
     state.controlsReady = true;
     rebuildList(window, state, state.motions); rebuildList(window, state, state.expressions);
@@ -850,7 +855,7 @@ void drawPreviewImage(const DRAWITEMSTRUCT& item, const DialogState& state) {
     if (state.frame.bgra.empty()) {
         SetBkMode(item.hDC, TRANSPARENT); SetTextColor(item.hDC, kMutedColor);
         auto rect = item.rcItem; const auto old = SelectObject(item.hDC, state.font);
-        DrawTextW(item.hDC, L"正在准备角色预览…", -1, &rect, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
+        DrawTextW(item.hDC, uiText(L"Preparing the character preview...", L"正在准备角色预览…"), -1, &rect, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
         SelectObject(item.hDC, old); return;
     }
     const float scale = std::min(static_cast<float>(item.rcItem.right - item.rcItem.left) / state.frame.width,
@@ -947,7 +952,7 @@ INT_PTR CALLBACK dialogProcedure(HWND window, UINT message, WPARAM wParam, LPARA
             state->playing = false;
             state->seconds = std::clamp(static_cast<int>(wParam), 0, 1000) * state->duration / 1000.0;
             state->previewDirty = true;
-            SetDlgItemTextW(window, kPlay, L"播放");
+            SetDlgItemTextW(window, kPlay, uiText(L"Play", L"播放"));
             tick(window, *state); return TRUE;
         }
         if (message == WM_HSCROLL && reinterpret_cast<HWND>(lParam) == GetDlgItem(window, kScrub)) {
@@ -967,7 +972,7 @@ INT_PTR CALLBACK dialogProcedure(HWND window, UINT message, WPARAM wParam, LPARA
             state->playing = false;
             state->seconds = std::max(0, std::min(1000, position)) * state->duration / 1000.0;
             state->previewDirty = true;
-            SetDlgItemTextW(window, kPlay, L"播放");
+            SetDlgItemTextW(window, kPlay, uiText(L"Play", L"播放"));
             tick(window, *state);
             return TRUE;
         }
@@ -1025,7 +1030,7 @@ INT_PTR CALLBACK dialogProcedure(HWND window, UINT message, WPARAM wParam, LPARA
                 state->playing = !state->playing;
                 state->lastTick = GetTickCount64();
                 state->previewDirty = true;
-                SetDlgItemTextW(window, kPlay, state->playing ? L"暂停" : L"播放");
+                SetDlgItemTextW(window, kPlay, state->playing ? uiText(L"Pause", L"暂停") : uiText(L"Play", L"播放"));
                 return TRUE;
             }
             if (id == IDCANCEL) { EndDialog(window, IDCANCEL); return TRUE; }
@@ -1052,7 +1057,7 @@ INT_PTR CALLBACK dialogProcedure(HWND window, UINT message, WPARAM wParam, LPARA
         if (message == WM_INITDIALOG) EndDialog(window, IDCANCEL);
         return TRUE;
     } catch (...) {
-        MessageBoxW(window, L"窗口操作失败。", L"AeGO Flash", MB_OK | MB_ICONERROR);
+        MessageBoxW(window, uiText(L"The window operation failed.", L"窗口操作失败。"), L"AeGO Flash", MB_OK | MB_ICONERROR);
         if (message == WM_INITDIALOG) EndDialog(window, IDCANCEL);
         return TRUE;
     }
@@ -1065,9 +1070,10 @@ bool runDialog(DialogState& state, void* ownerWindow) {
         DLGTEMPLATE dialog;
         WORD menu = 0;
         WORD windowClass = 0;
-        wchar_t title[32] = L"AeGO Flash — 导入动作与表情";
+        wchar_t title[32]{};
     } data{};
     static_assert(offsetof(Template, menu) == 18, "DLGTEMPLATE must use Windows packing.");
+    wcsncpy_s(data.title, uiText(L"AeGO Flash - Import Clips", L"AeGO Flash — 导入动作与表情"), _TRUNCATE);
     data.dialog.style = WS_POPUP | WS_CAPTION | WS_SYSMENU | DS_MODALFRAME | WS_CLIPCHILDREN;
     data.dialog.dwExtendedStyle = WS_EX_DLGMODALFRAME;
     data.dialog.cx = 600;

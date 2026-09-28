@@ -6,7 +6,7 @@
 #ifndef NOMINMAX
 #define NOMINMAX
 #endif
-#include <windows.h>
+#include "UiLanguage.h"
 #include <cstring>
 #include <initializer_list>
 #include <limits>
@@ -31,24 +31,24 @@ inline void copyUiUtf8(char* destination, size_t capacity, std::string_view text
 inline std::wstring uiWideFromUtf8(const std::string& text) {
     if (text.empty()) return {};
     if (text.size() > static_cast<size_t>((std::numeric_limits<int>::max)()))
-        return L"错误信息过长。";
+        return uiText(L"The error message is too long.", L"错误信息过长。");
     const int size = MultiByteToWideChar(CP_UTF8, 0, text.data(), static_cast<int>(text.size()), nullptr, 0);
-    if (!size) return L"无法读取错误信息。";
+    if (!size) return uiText(L"Unable to read the error message.", L"无法读取错误信息。");
     std::wstring result(static_cast<size_t>(size), L'\0');
     if (!MultiByteToWideChar(CP_UTF8, 0, text.data(), static_cast<int>(text.size()), result.data(), size))
-        return L"无法读取错误信息。";
+        return uiText(L"Unable to read the error message.", L"无法读取错误信息。");
     return result;
 }
 
 inline std::string uiUtf8FromWide(const std::wstring& text) {
     if (text.empty()) return {};
     if (text.size() > static_cast<size_t>((std::numeric_limits<int>::max)()))
-        return u8"错误信息过长。";
+        return simplifiedChineseUi() ? std::string(u8"错误信息过长。") : std::string("The error message is too long.");
     const int size = WideCharToMultiByte(CP_UTF8, 0, text.data(), static_cast<int>(text.size()), nullptr, 0, nullptr, nullptr);
-    if (!size) return u8"无法读取错误信息。";
+    if (!size) return simplifiedChineseUi() ? std::string(u8"无法读取错误信息。") : std::string("Unable to read the error message.");
     std::string result(static_cast<size_t>(size), '\0');
     if (!WideCharToMultiByte(CP_UTF8, 0, text.data(), static_cast<int>(text.size()), result.data(), size, nullptr, nullptr))
-        return u8"无法读取错误信息。";
+        return simplifiedChineseUi() ? std::string(u8"无法读取错误信息。") : std::string("Unable to read the error message.");
     return result;
 }
 
@@ -315,7 +315,11 @@ inline std::string translated(std::string_view text, unsigned depth = 0) {
 }
 } // namespace ui_text_detail
 
-inline std::string errorTextUtf8(const std::string& text) { return ui_text_detail::translated(text); }
+inline std::string errorTextUtf8(const std::string& text) {
+    if (!simplifiedChineseUi())
+        return text.empty() ? std::string("The operation could not be completed.") : text;
+    return ui_text_detail::translated(text);
+}
 inline std::wstring errorTextWide(const std::string& text) { return uiWideFromUtf8(errorTextUtf8(text)); }
 
 } // namespace l2dae

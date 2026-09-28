@@ -5,6 +5,7 @@
 #include <stdexcept>
 #include <string>
 #include <vector>
+#include <cwchar>
 
 namespace {
 int checks = 0;
@@ -89,6 +90,30 @@ int main() {
         expect(std::strlen(host.data()) < host.size(), "AE return message exceeded fixed field");
         expect(l2dae::uiUtf8FromWide(l2dae::uiWideFromUtf8(host.data())) == host.data(), "AE return message ended inside UTF-8");
         l2dae::copyUiUtf8(nullptr, 256, payload);
+        expect(std::wcscmp(l2dae::uiText(L"Import Model", L"导入模型"), L"导入模型") == 0, "Default UI language remains Simplified Chinese");
+        l2dae::setUiLanguageFromHost("en_US");
+        expect(l2dae::uiLanguage() == l2dae::UiLanguage::English, "English After Effects selects the English UI");
+        expect(std::wcscmp(l2dae::uiText(L"Import Model", L"导入模型"), L"Import Model") == 0, "English UI returns the English label");
+        expect(l2dae::errorTextUtf8("Import a Live2D model first.") == "Import a Live2D model first.", "English errors stay in English");
+        expect(l2dae::errorTextUtf8("") == "The operation could not be completed.", "Empty English error has an English fallback");
+        l2dae::setUiLanguageFromHost("ja_JP");
+        expect(l2dae::uiLanguage() == l2dae::UiLanguage::English, "Untranslated AE languages use English");
+        l2dae::setUiLanguageFromHost("");
+        expect(l2dae::uiLanguage() == l2dae::UiLanguage::English, "A missing language tag does not reset the UI language");
+        l2dae::setUiLanguageFromHost("zh-CN");
+        expect(l2dae::uiLanguage() == l2dae::UiLanguage::SimplifiedChinese, "zh-CN selects Simplified Chinese");
+        expect(l2dae::errorTextUtf8("Import a Live2D model first.") == u8"请先导入 Live2D 模型。", "Chinese UI translates errors again");
+        l2dae::setUiLanguageFromHost("ZH_cn");
+        expect(l2dae::simplifiedChineseUi(), "Chinese language tags are case-insensitive");
+        const wchar_t* englishLabels[] = {
+            L"Model & Animation", L"Import Model", L"Import Clips", L"Default Transition (frames)",
+            L"Horizontal Offset (px)", L"Lip Sync Sensitivity (%)", L"Motion A to B Blend (%)",
+            L"Expression A Amount (%)", L"Blink Duration (sec)"};
+        for (const wchar_t* label : englishLabels) {
+            expect(std::wcslen(label) < 32, "English effect name exceeds the 31-byte host field");
+            for (const wchar_t* cursor = label; *cursor; ++cursor)
+                expect(*cursor >= 32 && *cursor < 127, "English effect name is not ASCII");
+        }
         std::cout << "PASS: " << checks << " UI error localization checks; Unicode paths/curve IDs, diagnostics, idempotence and fixed UTF-8 fields.\n";
         return 0;
     } catch (const std::exception& error) {

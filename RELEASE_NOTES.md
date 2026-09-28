@@ -1,3 +1,13 @@
+# AeGO Flash 1.0.2
+
+界面语言 · Windows x64
+
+- 效果控件、导入窗口和脚本提示跟随 After Effects 语言：简体中文保持中文，其他语言使用英文。
+- 保留 1.0.1 的宿主版本与语言探测。失败的语言查询不会改掉已经确定的界面语言。
+- 导入窗口、渲染流程、工程标识和已有素材关联保持不变。
+
+安装包：`AeGOFlash-1.0.2-Windows-x64.zip`。源码包：`AeGOFlash-1.0.2-source.zip`。
+
 # AeGO Flash 1.0.1
 
 中文显示修复 · Windows x64

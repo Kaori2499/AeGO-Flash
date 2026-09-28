@@ -63,7 +63,12 @@ void initializeHostText(SPBasicSuite* basic, const char* version = nullptr) noex
         const std::lock_guard<std::mutex> guard(gHostTextMutex);
         if (processVersion.valid) gHostVersion = processVersion;
         else if (registrationVersion.valid) gHostVersion = registrationVersion;
-        if (languageValid) std::memcpy(gHostLanguage, language, sizeof(gHostLanguage));
+        if (languageValid) {
+            std::memcpy(gHostLanguage, language, sizeof(gHostLanguage));
+            // A failed callback can leave en_US in the buffer. Only a validated
+            // tag may change the UI language, and an empty tag stays put.
+            setUiLanguageFromHost(gHostLanguage);
+        }
         gHostCodePage.store(hostTextCodePage(gHostVersion, gHostLanguage), std::memory_order_relaxed);
     } catch (...) {
         // Failed optional discovery must not destroy a previously valid context.
@@ -138,7 +143,9 @@ PF_Err addMotionSlot(PF_InData* in_data, const wchar_t* name, A_long diskId, A_s
     def.ui_flags = PF_PUI_NO_ECW_UI;
     def.u.pd.num_choices = static_cast<A_short>(kLegacySlots);
     def.u.pd.value = def.u.pd.dephault = initial;
-    const auto choices = hostLabel(L"槽位 1|槽位 2|槽位 3|槽位 4|槽位 5|槽位 6|槽位 7|槽位 8");
+    const auto choices = hostLabel(uiText(
+        L"Slot 1|Slot 2|Slot 3|Slot 4|Slot 5|Slot 6|Slot 7|Slot 8",
+        L"槽位 1|槽位 2|槽位 3|槽位 4|槽位 5|槽位 6|槽位 7|槽位 8"));
     def.u.pd.u.namesptr = choices;
     return PF_ADD_PARAM(in_data, -1, &def);
 }
@@ -166,7 +173,7 @@ PF_Err addCheckbox(PF_InData* in_data, const wchar_t* name, A_long diskId,
     def.param_type = PF_Param_CHECKBOX;
     def.flags = flags;
     if (hidden) def.ui_flags = PF_PUI_NO_ECW_UI;
-    def.u.bd.u.nameptr = hostLabel(L"启用");
+    def.u.bd.u.nameptr = hostLabel(uiText(L"Enable", L"启用"));
     def.u.bd.value = def.u.bd.dephault = initial;
     return PF_ADD_PARAM(in_data, -1, &def);
 }
@@ -176,10 +183,10 @@ PF_Err setupParameters(PF_InData* in_data, PF_OutData* out_data) {
     PF_ParamDef def{};
     // Registration order mirrors ParameterIndex. Original disk IDs, defaults,
     // parameter types and animation flags preserve saved projects and keyframes.
-    if ((err = addGroup(in_data, L"模型与动画", 201, false, false))) return err;
-    if ((err = addButton(in_data, L"导入模型", 101, hostLabel(L"导入模型…")))) return err;
+    if ((err = addGroup(in_data, uiText(L"Model & Animation", L"模型与动画"), 201, false, false))) return err;
+    if ((err = addButton(in_data, uiText(L"Import Model", L"导入模型"), 101, hostLabel(uiText(L"Import Model...", L"导入模型…"))))) return err;
     def = {};
-    parameterName(def, L"模型选择", kSelectionDiskId);
+    parameterName(def, uiText(L"Model Selection", L"模型选择"), kSelectionDiskId);
     def.param_type = PF_Param_ARBITRARY_DATA;
     def.flags = PF_ParamFlag_CANNOT_TIME_VARY;
     def.ui_flags = PF_PUI_NO_ECW_UI;
@@ -189,44 +196,44 @@ PF_Err setupParameters(PF_InData* in_data, PF_OutData* out_data) {
     if (err) { if (def.u.arb_d.id == kSelectionDiskId) disposeBank<SelectionData>(in_data, def.u.arb_d.dephault); else disposeBank<ExpressionData>(in_data, def.u.arb_d.dephault); return err; }
     // AE owns the default handle after successful PF_ADD_PARAM.
 
-    if ((err = addButton(in_data, L"导入动作与表情", 116, hostLabel(L"导入动作与表情…")))) return err;
-    if ((err = addSlider(in_data, L"默认过渡 (帧)", 133, 0, 100000, 0, 60, 30, 0, false))) return err;
+    if ((err = addButton(in_data, uiText(L"Import Clips", L"导入动作与表情"), 116, hostLabel(uiText(L"Import Motions & Expressions...", L"导入动作与表情…"))))) return err;
+    if ((err = addSlider(in_data, uiText(L"Default Transition (frames)", L"默认过渡 (帧)"), 133, 0, 100000, 0, 60, 30, 0, false))) return err;
     if ((err = addGroup(in_data, L"", 202, true, false))) return err;
-    if ((err = addGroup(in_data, L"位置与大小", 203, false, false))) return err;
-    if ((err = addSlider(in_data, L"缩放 (%)", 106, 1, 10000, 1, 200, 100, 1))) return err;
-    if ((err = addSlider(in_data, L"水平偏移 (像素)", 107, -100000, 100000, -2000, 2000, 0, 1))) return err;
-    if ((err = addSlider(in_data, L"垂直偏移 (像素)", 108, -100000, 100000, -2000, 2000, 0, 1))) return err;
+    if ((err = addGroup(in_data, uiText(L"Position & Scale", L"位置与大小"), 203, false, false))) return err;
+    if ((err = addSlider(in_data, uiText(L"Scale (%)", L"缩放 (%)"), 106, 1, 10000, 1, 200, 100, 1))) return err;
+    if ((err = addSlider(in_data, uiText(L"Horizontal Offset (px)", L"水平偏移 (像素)"), 107, -100000, 100000, -2000, 2000, 0, 1))) return err;
+    if ((err = addSlider(in_data, uiText(L"Vertical Offset (px)", L"垂直偏移 (像素)"), 108, -100000, 100000, -2000, 2000, 0, 1))) return err;
     if ((err = addGroup(in_data, L"", 204, true, false))) return err;
-    if ((err = addGroup(in_data, L"声音与口型", 205, false, true))) return err;
+    if ((err = addGroup(in_data, uiText(L"Audio & Lip Sync", L"声音与口型"), 205, false, true))) return err;
     def = {};
-    parameterName(def, L"音频图层", 123);
+    parameterName(def, uiText(L"Audio Layer", L"音频图层"), 123);
     def.param_type = PF_Param_LAYER;
     def.flags = PF_ParamFlag_CANNOT_TIME_VARY;
     def.u.ld.dephault = PF_LayerDefault_NONE;
     if ((err = PF_ADD_PARAM(in_data, -1, &def))) return err;
-    if ((err = addCheckbox(in_data, L"声音同步口型", 124, PF_ParamFlag_CANNOT_TIME_VARY, FALSE, false))) return err;
-    if ((err = addSlider(in_data, L"口型灵敏度 (%)", 125, 0, 500, 0, 500, 100, 1))) return err;
+    if ((err = addCheckbox(in_data, uiText(L"Lip Sync to Audio", L"声音同步口型"), 124, PF_ParamFlag_CANNOT_TIME_VARY, FALSE, false))) return err;
+    if ((err = addSlider(in_data, uiText(L"Lip Sync Sensitivity (%)", L"口型灵敏度 (%)"), 125, 0, 500, 0, 500, 100, 1))) return err;
     if ((err = addGroup(in_data, L"", 206, true, false))) return err;
-    if ((err = addGroup(in_data, L"呼吸与眨眼", 207, false, true))) return err;
-    if ((err = addCheckbox(in_data, L"呼吸动画", 126, PF_ParamFlag_CANNOT_INTERP, FALSE, false))) return err;
-    if ((err = addSlider(in_data, L"呼吸幅度 (%)", 128, 0, 100, 0, 100, 100, 1))) return err;
-    if ((err = addSlider(in_data, L"呼吸周期 (秒)", 129, .1f, 60, .1f, 10, 4, 2))) return err;
-    if ((err = addCheckbox(in_data, L"自动眨眼", 127, PF_ParamFlag_CANNOT_INTERP, FALSE, false))) return err;
-    if ((err = addSlider(in_data, L"眨眼间隔 (秒)", 131, .2f, 60, .2f, 10, 4, 2))) return err;
+    if ((err = addGroup(in_data, uiText(L"Breathing & Blink", L"呼吸与眨眼"), 207, false, true))) return err;
+    if ((err = addCheckbox(in_data, uiText(L"Breathing", L"呼吸动画"), 126, PF_ParamFlag_CANNOT_INTERP, FALSE, false))) return err;
+    if ((err = addSlider(in_data, uiText(L"Breathing Amount (%)", L"呼吸幅度 (%)"), 128, 0, 100, 0, 100, 100, 1))) return err;
+    if ((err = addSlider(in_data, uiText(L"Breathing Period (sec)", L"呼吸周期 (秒)"), 129, .1f, 60, .1f, 10, 4, 2))) return err;
+    if ((err = addCheckbox(in_data, uiText(L"Auto Blink", L"自动眨眼"), 127, PF_ParamFlag_CANNOT_INTERP, FALSE, false))) return err;
+    if ((err = addSlider(in_data, uiText(L"Blink Interval (sec)", L"眨眼间隔 (秒)"), 131, .2f, 60, .2f, 10, 4, 2))) return err;
     if ((err = addGroup(in_data, L"", 208, true, false))) return err;
     // Hidden data and legacy streams keep their original persistent IDs.
-    if ((err = addCheckbox(in_data, L"循环动作", 103, PF_ParamFlag_CANNOT_TIME_VARY, TRUE, true))) return err;
-    if ((err = addSlider(in_data, L"播放速度", 104, 0, 100, 0, 4, 1, 2, false))) return err;
-    if ((err = addSlider(in_data, L"起始时间 (秒)", 105, -86400, 86400, 0, 60, 0, 3, false))) return err;
-    if ((err = addMotionSlot(in_data, L"动作 A 槽位", 109, 1))) return err;
-    if ((err = addMotionSlot(in_data, L"动作 B 槽位", 110, 2))) return err;
-    if ((err = addCheckbox(in_data, L"动作时间关键帧", 111, PF_ParamFlag_CANNOT_TIME_VARY, FALSE, true))) return err;
-    if ((err = addSlider(in_data, L"动作 A 时间 (秒)", 112, 0, 86400, 0, 60, 0, 3))) return err;
-    if ((err = addSlider(in_data, L"动作 B 时间 (秒)", 113, 0, 86400, 0, 60, 0, 3))) return err;
-    if ((err = addSlider(in_data, L"动作 A 到 B 过渡 (%)", 114, 0, 110, 0, 110, 0, 1))) return err;
-    if ((err = addSlider(in_data, L"动作轨道绑定", 115, 0, 2147483648.0f, 0, 2147483648.0f, 0, 0, false))) return err;
+    if ((err = addCheckbox(in_data, uiText(L"Loop Motion", L"循环动作"), 103, PF_ParamFlag_CANNOT_TIME_VARY, TRUE, true))) return err;
+    if ((err = addSlider(in_data, uiText(L"Playback Speed", L"播放速度"), 104, 0, 100, 0, 4, 1, 2, false))) return err;
+    if ((err = addSlider(in_data, uiText(L"Start Time (sec)", L"起始时间 (秒)"), 105, -86400, 86400, 0, 60, 0, 3, false))) return err;
+    if ((err = addMotionSlot(in_data, uiText(L"Motion A Slot", L"动作 A 槽位"), 109, 1))) return err;
+    if ((err = addMotionSlot(in_data, uiText(L"Motion B Slot", L"动作 B 槽位"), 110, 2))) return err;
+    if ((err = addCheckbox(in_data, uiText(L"Motion Time Keys", L"动作时间关键帧"), 111, PF_ParamFlag_CANNOT_TIME_VARY, FALSE, true))) return err;
+    if ((err = addSlider(in_data, uiText(L"Motion A Time (sec)", L"动作 A 时间 (秒)"), 112, 0, 86400, 0, 60, 0, 3))) return err;
+    if ((err = addSlider(in_data, uiText(L"Motion B Time (sec)", L"动作 B 时间 (秒)"), 113, 0, 86400, 0, 60, 0, 3))) return err;
+    if ((err = addSlider(in_data, uiText(L"Motion A to B Blend (%)", L"动作 A 到 B 过渡 (%)"), 114, 0, 110, 0, 110, 0, 1))) return err;
+    if ((err = addSlider(in_data, uiText(L"Motion Track Binding", L"动作轨道绑定"), 115, 0, 2147483648.0f, 0, 2147483648.0f, 0, 0, false))) return err;
     def = {};
-    parameterName(def, L"表情选择", kExpressionDiskId);
+    parameterName(def, uiText(L"Expression Selection", L"表情选择"), kExpressionDiskId);
     def.param_type = PF_Param_ARBITRARY_DATA;
     def.flags = PF_ParamFlag_CANNOT_TIME_VARY;
     def.ui_flags = PF_PUI_NO_ECW_UI;
@@ -234,17 +241,19 @@ PF_Err setupParameters(PF_InData* in_data, PF_OutData* out_data) {
     def.u.arb_d.dephault = newBank<ExpressionData>(in_data, std::make_shared<const ExpressionData>());
     err = PF_ADD_PARAM(in_data, -1, &def);
     if (err) { if (def.u.arb_d.id == kSelectionDiskId) disposeBank<SelectionData>(in_data, def.u.arb_d.dephault); else disposeBank<ExpressionData>(in_data, def.u.arb_d.dephault); return err; }
-    if ((err = addMotionSlot(in_data, L"表情 A 槽位", 118, 1))) return err;
-    if ((err = addMotionSlot(in_data, L"表情 B 槽位", 119, 2))) return err;
-    if ((err = addSlider(in_data, L"表情 A 强度 (%)", 120, 0, 100, 0, 100, 0, 1))) return err;
-    if ((err = addSlider(in_data, L"表情 B 强度 (%)", 121, 0, 100, 0, 100, 0, 1))) return err;
-    if ((err = addSlider(in_data, L"表情轨道绑定", 122, 0, 2147483648.0f, 0, 2147483648.0f, 0, 0, false))) return err;
-    if ((err = addSlider(in_data, L"眨眼强度 (%)", 130, 0, 100, 0, 100, 100, 1))) return err;
-    if ((err = addSlider(in_data, L"眨眼时长 (秒)", 132, .02f, 2, .02f, 2, .3f, 2))) return err;
+    if ((err = addMotionSlot(in_data, uiText(L"Expression A Slot", L"表情 A 槽位"), 118, 1))) return err;
+    if ((err = addMotionSlot(in_data, uiText(L"Expression B Slot", L"表情 B 槽位"), 119, 2))) return err;
+    if ((err = addSlider(in_data, uiText(L"Expression A Amount (%)", L"表情 A 强度 (%)"), 120, 0, 100, 0, 100, 0, 1))) return err;
+    if ((err = addSlider(in_data, uiText(L"Expression B Amount (%)", L"表情 B 强度 (%)"), 121, 0, 100, 0, 100, 0, 1))) return err;
+    if ((err = addSlider(in_data, uiText(L"Expression Binding", L"表情轨道绑定"), 122, 0, 2147483648.0f, 0, 2147483648.0f, 0, 0, false))) return err;
+    if ((err = addSlider(in_data, uiText(L"Blink Strength (%)", L"眨眼强度 (%)"), 130, 0, 100, 0, 100, 100, 1))) return err;
+    if ((err = addSlider(in_data, uiText(L"Blink Duration (sec)", L"眨眼时长 (秒)"), 132, .02f, 2, .02f, 2, .3f, 2))) return err;
     // Preserve old popup disk IDs, types and keyframes. Zero chooses the legacy
     // stream; current timeline clips use these exact integer float streams.
     for (A_long id : {134L, 135L, 136L, 137L}) {
-        const wchar_t* names[] = {L"动作 A 编号", L"动作 B 编号", L"表情 A 编号", L"表情 B 编号"};
+        const wchar_t* names[] = {
+            uiText(L"Motion A Index", L"动作 A 编号"), uiText(L"Motion B Index", L"动作 B 编号"),
+            uiText(L"Expression A Index", L"表情 A 编号"), uiText(L"Expression B Index", L"表情 B 编号")};
         if ((err = addSlider(in_data, names[id - 134], id, 0, static_cast<float>(kMaximumIndex), 0,
                 static_cast<float>(kMaximumIndex), 0, 0))) return err;
     }
@@ -583,9 +592,11 @@ PF_Err reportError(PF_OutData* out_data, const char* message, PF_Err error) noex
         } catch (...) {
             // Pre-encoded fallback is allocation-free, including on a low-memory path.
             const UINT page = gHostCodePage.load(std::memory_order_relaxed);
-            const char* fallback = page == 936
+            const char* fallback = !simplifiedChineseUi() || (page != 936 && page != CP_UTF8)
+                ? "AeGO Flash: operation failed."
+                : page == 936
                 ? "AeGO Flash: \xb2\xd9\xd7\xf7\xca\xa7\xb0\xdc\xa1\xa3"
-                : page == CP_UTF8 ? u8"AeGO Flash：操作失败，请重试。" : "AeGO Flash: operation failed.";
+                : u8"AeGO Flash：操作失败，请重试。";
             std::snprintf(out_data->return_msg, sizeof(out_data->return_msg), "%s", fallback);
         }
         out_data->out_flags |= PF_OutFlag_DISPLAY_ERROR_MESSAGE;
@@ -625,10 +636,15 @@ extern "C" DllExport PF_Err EffectMain(PF_Cmd cmd, PF_InData* in_data, PF_OutDat
         case PF_Cmd_ABOUT:
             initializeHostText(in_data ? in_data->pica_basicP : nullptr);
             std::snprintf(out_data->return_msg, sizeof(out_data->return_msg),
-                "%s", hostText(L"AeGO Flash 1.0.1\r导入模型后，可预览并导入动作与表情。\r"
+                "%s", hostText(uiText(
+                L"AeGO Flash 1.0.2\rImport a model, then preview motions and expressions.\r"
+                L"Breathing and blinking can be adjusted and keyframed.\r"
+                L"Choose an audio layer and enable lip sync.\r"
+                L"Uses external model files. 8-bit render, for 8- or 16-bit comps.",
+                L"AeGO Flash 1.0.2\r导入模型后，可预览并导入动作与表情。\r"
                 L"呼吸与眨眼支持参数调节和关键帧。\r"
                 L"选择音频图层，启用声音同步口型。\r"
-                L"使用外部模型文件；8 位渲染，可输出至 8/16 位合成。").c_str());
+                L"使用外部模型文件；8 位渲染，可输出至 8/16 位合成。")).c_str());
             return PF_Err_NONE;
         case PF_Cmd_GLOBAL_SETUP:
             initializeHostText(in_data ? in_data->pica_basicP : nullptr);

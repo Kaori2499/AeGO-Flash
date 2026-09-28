@@ -246,7 +246,7 @@ struct Host {
         const auto text = decode(out.return_msg, expectedPage());
         require(text.find(L"选择音频图层，启用声音同步口型。") != std::wstring::npos,
             "About Chinese body round-trips without corruption");
-        require(text.find(L"AeGO Flash 1.0.1\r") == 0, "About identifies the fixed release as AeGO Flash 1.0.1");
+        require(text.find(L"AeGO Flash 1.0.2\r") == 0, "About identifies the release as AeGO Flash 1.0.2");
         require(suiteReferences == 0, "ABOUT does not retain host suites");
     }
     void releaseParameters() {

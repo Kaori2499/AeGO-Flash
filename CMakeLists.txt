@@ -3,7 +3,7 @@ cmake_policy(SET CMP0091 NEW)
 set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
 option(BUILD_AE_PLUGIN "Build the AEX plugin (requires Adobe SDK)" ON)
 option(USE_ADOBE_PIPL_TOOL "Regenerate PiPL through the optional Adobe PiPLtool instead of the authored RC resource" OFF)
-project(AeGOFlash VERSION 1.0.1 LANGUAGES CXX)
+project(AeGOFlash VERSION 1.0.2 LANGUAGES CXX)
 
 if(NOT WIN32 OR NOT MSVC OR NOT CMAKE_SIZEOF_VOID_P EQUAL 8)
     message(FATAL_ERROR "AeGO Flash requires Windows x64 and Visual Studio 2022 (v143).")

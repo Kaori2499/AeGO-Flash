@@ -33,13 +33,16 @@
         "Expression binding": 122, "Motion A index": 134, "Motion B index": 135,
         "Expression A index": 136, "Expression B index": 137
     };
+    var CHINESE = false;
+    try { CHINESE = /^zh[-_]cn$/i.test(String(app.isoLanguage)); } catch (ignored) { CHINESE = false; }
+    function text(english, chinese) { return CHINESE ? chinese : english; }
 
     function fail(message) { throw new Error("AeGO Flash: " + message); }
     function finite(value) { return typeof value === "number" && isFinite(value); }
     function integer(value) { return finite(value) && Math.floor(value) === value; }
     function findParameter(group, name) {
         var id = PARAMETER_IDS[name];
-        if (!id) fail("无法识别效果参数，请检查插件与脚本版本。");
+        if (!id) fail(text("Unrecognized effect parameter. Check that the plug-in and script versions match.", "无法识别效果参数，请检查插件与脚本版本。"));
         var match = MATCH + "-" + ("0000" + id).slice(-4);
         function find(parent) {
             var direct = parent.property(match);
@@ -59,7 +62,7 @@
     }
     function property(group, name) {
         var result = findParameter(group, name);
-        if (!result) fail("缺少必要的 AeGO Flash 效果参数（编号 " + PARAMETER_IDS[name] + "），请完整更新插件文件夹。");
+        if (!result) fail(text("Missing AeGO Flash parameter (id " + PARAMETER_IDS[name] + "). Reinstall the complete plug-in folder.", "缺少必要的 AeGO Flash 效果参数（编号 " + PARAMETER_IDS[name] + "），请完整更新插件文件夹。"));
         return result;
     }
     function ownerFromExpression(value, channel) {
@@ -264,7 +267,7 @@
 
     function prepareClip(payload) {
         if (!payload || (typeof payload.kind !== "undefined" && payload.kind !== "motion" && payload.kind !== "expression")) {
-            fail("时间线片段类型无效，请重新选择动作或表情。");
+            fail(text("Invalid timeline clip type. Choose a motion or expression again.", "时间线片段类型无效，请重新选择动作或表情。"));
         }
         var isExpression = payload.kind === "expression";
         var channel = isExpression ? EXPRESSION_CHANNEL : MOTION_CHANNEL;
@@ -279,9 +282,9 @@
             typeof payload.label !== "string" || typeof append !== "boolean" ||
             !integer(transitionFrames) || transitionFrames < 0 || transitionFrames > 100000 ||
             !integer(transitionCurve) || transitionCurve < 0 || transitionCurve > 5) {
-            fail("时间线片段设置无效，请检查动作时长和过渡设置。");
+            fail(text("Invalid timeline clip settings. Check the motion duration and transition.", "时间线片段设置无效，请检查动作时长和过渡设置。"));
         }
-        if (!app.project) fail("请先打开一个 AE 工程，再导入动作或表情。");
+        if (!app.project) fail(text("Open an After Effects project before importing a motion or expression.", "请先打开一个 AE 工程，再导入动作或表情。"));
         var matches = [], i, j, k;
         for (i = 1; i <= app.project.numItems; ++i) {
             var item = app.project.item(i);
@@ -301,10 +304,10 @@
             }
         }
         if (matches.length !== 1) fail(matches.length ?
-            "创建片段前检测到模型效果被复制，请在目标模型上重新导入。" :
-            "找不到目标模型效果，请在目标模型上重新导入。");
+            text("The model effect was duplicated before the clip was created. Import again on the target model.", "创建片段前检测到模型效果被复制，请在目标模型上重新导入。") :
+            text("The target model effect was not found. Import again on the target model.", "找不到目标模型效果，请在目标模型上重新导入。"));
         var target = matches[0], comp = target.comp, fx = target.effect;
-        if (target.layer.locked) fail("请先解锁模型图层，再导入动作或表情。");
+        if (target.layer.locked) fail(text("Unlock the model layer before importing a motion or expression.", "请先解锁模型图层，再导入动作或表情。"));
         var controls = [], legacyControls = [], oldOwner = 0, expressionsOwned = 0;
         for (i = 0; i < names.length; ++i) {
             var control = property(fx, names[i]), oldExpression = control.expression || "";
@@ -314,42 +317,42 @@
                 var legacyExpression = legacyControl.expression || "";
                 var legacyOwner = ownerFromExpression(legacyExpression, channel);
                 if (legacyControl.numKeys || (legacyExpression && !legacyOwner)) {
-                    fail("现有关键帧或自定义表达式会被覆盖，请使用新的 AeGO Flash 效果导入时间线片段。");
+                    fail(text("Existing keyframes or custom expressions would be overwritten. Add a new AeGO Flash effect before importing clips.", "现有关键帧或自定义表达式会被覆盖，请使用新的 AeGO Flash 效果导入时间线片段。"));
                 }
                 if (foundOwner && legacyOwner && foundOwner !== legacyOwner)
-                    fail("时间线表达式关联了不同的片段组，请恢复原表达式或使用新的 AeGO Flash 效果。");
+                    fail(text("Timeline expressions belong to a different clip group. Restore the original expressions or use a new AeGO Flash effect.", "时间线表达式关联了不同的片段组，请恢复原表达式或使用新的 AeGO Flash 效果。"));
                 if (!foundOwner && !oldExpression && legacyOwner) foundOwner = legacyOwner;
                 if (legacyOwner) legacyControls.push({ property: legacyControl, expression: legacyExpression,
                     enabled: legacyControl.expressionEnabled, value: legacyControl.value });
             }
             if (control.numKeys || (oldExpression && !foundOwner)) {
-                fail("现有关键帧或自定义表达式会被覆盖，请使用新的 AeGO Flash 效果导入时间线片段。");
+                fail(text("Existing keyframes or custom expressions would be overwritten. Add a new AeGO Flash effect before importing clips.", "现有关键帧或自定义表达式会被覆盖，请使用新的 AeGO Flash 效果导入时间线片段。"));
             }
             if (foundOwner) {
-                if (oldOwner && oldOwner !== foundOwner) fail("时间线表达式关联了不同的片段组，请恢复原表达式或使用新的 AeGO Flash 效果。");
+                if (oldOwner && oldOwner !== foundOwner) fail(text("Timeline expressions belong to a different clip group. Restore the original expressions or use a new AeGO Flash effect.", "时间线表达式关联了不同的片段组，请恢复原表达式或使用新的 AeGO Flash 效果。"));
                 oldOwner = foundOwner;
                 ++expressionsOwned;
             }
-            if (!control.canSetExpression) fail("此效果无法使用时间线表达式，请使用新的 AeGO Flash 效果。");
+            if (!control.canSetExpression) fail(text("This effect cannot use timeline expressions. Use a new AeGO Flash effect.", "此效果无法使用时间线表达式，请使用新的 AeGO Flash 效果。"));
             controls.push({ property: control, expression: oldExpression,
                             enabled: control.expressionEnabled, value: control.value });
         }
         if (expressionsOwned !== 0 && expressionsOwned !== names.length) {
-            fail("部分时间线表达式已被移除，请恢复原表达式或使用新的 AeGO Flash 效果。");
+            fail(text("Some timeline expressions were removed. Restore them or use a new AeGO Flash effect.", "部分时间线表达式已被移除，请恢复原表达式或使用新的 AeGO Flash 效果。"));
         }
         if (!oldOwner && integer(payload.previousBinding) && payload.previousBinding > 0) oldOwner = payload.previousBinding;
         var manual = null, loop = null, oldManual = 0, oldLoop = 0;
         if (!isExpression) {
             manual = property(fx, "Keyframe motion time");
-            if (manual.numKeys || manual.expression) fail("使用片段前，请移除“动作时间关键帧”选项上的关键帧或表达式。");
+            if (manual.numKeys || manual.expression) fail(text("Remove keyframes or expressions on Motion Time Keys before using clips.", "使用片段前，请移除“动作时间关键帧”选项上的关键帧或表达式。"));
             loop = property(fx, "Loop motion");
-            if (loop.numKeys || loop.expression) fail("使用片段前，请移除“循环动作”选项上的关键帧或表达式。");
+            if (loop.numKeys || loop.expression) fail(text("Remove keyframes or expressions on Loop Motion before using clips.", "使用片段前，请移除“循环动作”选项上的关键帧或表达式。"));
             oldManual = manual.value;
             oldLoop = loop.value;
         }
         var oldClips = findClips(comp, oldOwner, channel);
         for (i = 0; i < oldClips.length; ++i) {
-            if (oldClips[i].layer.locked) fail("请先解锁现有的 AeGO Flash " + (isExpression ? "表情" : "动作") + "片段，再导入新片段。");
+            if (oldClips[i].layer.locked) fail(text("Unlock the existing AeGO Flash " + (isExpression ? "expression" : "motion") + " clip before importing another.", "请先解锁现有的 AeGO Flash " + (isExpression ? "表情" : "动作") + "片段，再导入新片段。"));
         }
         var cloneOld = ownedByAnotherEffect(comp, target, oldOwner, channel);
         var fade = transitionFrames * comp.frameDuration;
@@ -367,16 +370,16 @@
     }
     function addClips(payloads) {
         if (!payloads || typeof payloads.length !== "number" || payloads.length < 1 || payloads.length > 2)
-            fail("请选择一个动作、一个表情，或同时选择动作与表情。");
+            fail(text("Choose one motion, one expression, or both.", "请选择一个动作、一个表情，或同时选择动作与表情。"));
         var plans = [], i, j, plan, motion = null, face = null;
         // Resolve every target and protect every edited control before mutation.
         for (i = 0; i < payloads.length; ++i) {
             plan = prepareClip(payloads[i]);
             if (plan.isExpression) {
-                if (face) fail("每次导入只能选择一个表情。");
+                if (face) fail(text("Choose only one expression for this import.", "每次导入只能选择一个表情。"));
                 face = plan;
             } else {
-                if (motion) fail("每次导入只能选择一个动作。");
+                if (motion) fail(text("Choose only one motion for this import.", "每次导入只能选择一个动作。"));
                 motion = plan;
             }
             plans.push(plan);
@@ -385,14 +388,14 @@
         if (motion && face) {
             if (motion.comp !== face.comp || motion.target.layer.index !== face.target.layer.index ||
                 motion.target.effect.propertyIndex !== face.target.effect.propertyIndex)
-                fail("同时导入的动作与表情必须属于同一个模型效果。");
+                fail(text("A motion and expression imported together must belong to the same model effect.", "同时导入的动作与表情必须属于同一个模型效果。"));
             face.start = motion.start;
         }
         for (i = 0; i < plans.length; ++i) {
             plan = plans[i]; plan.end = Math.min(comp.duration, plan.start + plan.duration);
             if (!finite(plan.start) || plan.start < 0 || plan.start >= comp.duration ||
                 plan.end - plan.start < comp.frameDuration) {
-                fail("当前位置剩余时长不足，请延长合成或选择更早的时间后再导入。");
+                fail(text("Not enough time remains at the current position. Extend the composition or start earlier.", "当前位置剩余时长不足，请延长合成或选择更早的时间后再导入。"));
             }
         }
         var selection = [], existingItems = {};
@@ -401,7 +404,7 @@
         var created = [], createdSources = [], retagged = [], sourceCandidates = [], renamedSources = [];
         var startedUndo = false, failure = null;
         try {
-            app.beginUndoGroup("导入 AeGO Flash 动作与表情");
+            app.beginUndoGroup(text("Import AeGO Flash Clips", "导入 AeGO Flash 动作与表情"));
             startedUndo = true;
             for (j = 0; j < plans.length; ++j) {
                 plan = plans[j];
@@ -445,7 +448,7 @@
                     var control = plan.controls[i].property;
                     control.expression = plan.isExpression ? expressionWeights(payload.binding, i) : expression(payload.binding, i);
                     control.expressionEnabled = true;
-                    if (control.expressionError) fail("AE 无法执行时间线表达式：" + control.expressionError);
+                    if (control.expressionError) fail(text("After Effects could not evaluate a timeline expression: ", "AE 无法执行时间线表达式：") + control.expressionError);
                 }
             }
             // AE normally displays Source Name in the Timeline. Name our owned

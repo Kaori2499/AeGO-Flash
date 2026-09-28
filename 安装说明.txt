@@ -1,12 +1,12 @@
-AeGO Flash 1.0.1 · Windows x64
+AeGO Flash 1.0.2 · Windows x64
 
-本次修复 AE 2024／2025 重启后效果控件中文乱码；导入窗口、渲染和工程标识保持不变。
+界面跟随 After Effects 语言：简体中文显示中文，其他语言显示英文。1.0.1 的编码修复仍然有效。
 
 安装
 1. 保存工程副本并关闭 After Effects。
 2. 如已安装 AeGOFlash，先备份原文件夹再完整替换。
    如果 Plug-ins 中还有 Live2DNativeAE 文件夹，将它移出备份，避免同一效果重复加载。
-3. 解压 AeGOFlash-1.0.1-Windows-x64.zip，将整个 AeGOFlash 文件夹复制到：
+3. 解压 AeGOFlash-1.0.2-Windows-x64.zip，将整个 AeGOFlash 文件夹复制到：
    C:\Program Files\Adobe\Adobe After Effects 2026\Support Files\Plug-ins\
    使用其他 AE 版本时，选择该版本对应的 Support Files\Plug-ins 目录。
 4. 保留 AeGOFlash.aex、FrameworkShaders、scripts 和 licenses，不要只复制 .aex。
