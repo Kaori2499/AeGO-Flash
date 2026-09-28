@@ -23,9 +23,9 @@ BEGIN
     0x3842494dL, 0x65505652L, 0L, 4L, 2, 0,
     // 8BIM / eSVR: AE2022 minimum effect API (independent of the build SDK).
     0x3842494dL, 0x65535652L, 0L, 4L, 13, 27,
-    // Public AeGO Flash 1.0.0; independent AE compatibility version.
-    // 8BIM / eVER: PF_VERSION(1, 13, 0, PF_Stage_RELEASE, 1).
-    0x3842494dL, 0x65564552L, 0L, 4L, 951809L,
+    // Public AeGO Flash 1.0.1; independent AE compatibility version.
+    // 8BIM / eVER: PF_VERSION(1, 13, 1, PF_Stage_RELEASE, 1).
+    0x3842494dL, 0x65564552L, 0L, 4L, 953857L,
     // 8BIM / eINF: WORD flags followed by WORD padding.
     0x3842494dL, 0x65494e46L, 0L, 2L, 0, 0,
     // 8BIM / eGLO: DEEP_COLOR_AWARE | NON_PARAM_VARY | PIX_INDEPENDENT | I_USE_AUDIO | WIDE_TIME_INPUT.

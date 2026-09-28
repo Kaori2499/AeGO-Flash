@@ -1,0 +1,2 @@
+Actual executable product/file version: 26.3.0.87
+PASS: 43 runtime host-version checks; numeric product/file fallback, invalid resources, exact process-name boundary and cached non-host rejection. All file access was read-only.

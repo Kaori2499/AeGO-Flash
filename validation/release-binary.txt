@@ -1,9 +1,9 @@
 Product=AeGO Flash
-FileVersion=1.0.0.1
-ProductVersion=1.0.0
+FileVersion=1.0.1.1
+ProductVersion=1.0.1
 OriginalFilename=AeGOFlash.aex
-Bytes=1038336
-SHA256=c23b57e94cf7c2b8efb53dba5f5b72f7ae532b73a699cbe9045833960a052aed
+Bytes=1041920
+SHA256=f2f1c931930eef68bf51203426ac2ecfef0a16ead74d2b9ff011e65fef5dc4eb
 DisplayName=AeGO Flash; Category=AeGO; MatchName=L2DAE Native Renderer
-AECompatibilityVersion=951809; MinimumAPI=13.27; OutFlags=0x02100406; OutFlags2=0x08000088
-Seven relevant native suites and 6358 timeline assertions passed. Actual AE installation acceptance remains pending.
+AECompatibilityVersion=953857; MinimumAPI=13.27; OutFlags=0x02100406; OutFlags2=0x08000088
+21 relevant native tests (including 15 cold-host cases) and 6358 timeline assertions passed. Actual AE installation and restart acceptance remains pending.

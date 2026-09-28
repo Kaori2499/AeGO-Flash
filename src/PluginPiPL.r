@@ -13,9 +13,9 @@ resource 'PiPL' (16000) {
         CodeWin64X86 { "EffectMain" },
         AE_PiPL_Version { 2, 0 },
         AE_Effect_Spec_Version { 13, 27 },
-        /* Public AeGO Flash 1.0.0; independent AE compatibility version.
-           PF_VERSION(1, 13, 0, PF_Stage_RELEASE, 1). */
-        AE_Effect_Version { 951809 },
+        /* Public AeGO Flash 1.0.1; independent AE compatibility version.
+           PF_VERSION(1, 13, 1, PF_Stage_RELEASE, 1). */
+        AE_Effect_Version { 953857 },
         AE_Effect_Info_Flags { 0 },
         /* DEEP_COLOR_AWARE | NON_PARAM_VARY | PIX_INDEPENDENT | I_USE_AUDIO | WIDE_TIME_INPUT. */
         AE_Effect_Global_OutFlags { 0x02100406 },

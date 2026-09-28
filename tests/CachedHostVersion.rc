@@ -1,0 +1,42 @@
+#include <windows.h>
+
+#ifndef AE_TEST_HOST_MAJOR
+#error Define AE_TEST_HOST_MAJOR for the test source and resource.
+#endif
+#ifndef AE_TEST_HOST_MINOR
+#error Define AE_TEST_HOST_MINOR for the test source and resource.
+#endif
+#define AE_TEST_STRING_INNER(value) #value
+#define AE_TEST_STRING(value) AE_TEST_STRING_INNER(value)
+#define AE_TEST_VERSION AE_TEST_STRING(AE_TEST_HOST_MAJOR) "." AE_TEST_STRING(AE_TEST_HOST_MINOR) ".0.0"
+
+// This intentionally unsigned fixture must never be described as an Adobe
+// executable. Only the filename and numeric version simulate host discovery.
+1 VERSIONINFO
+ FILEVERSION AE_TEST_HOST_MAJOR,AE_TEST_HOST_MINOR,0,0
+ PRODUCTVERSION AE_TEST_HOST_MAJOR,AE_TEST_HOST_MINOR,0,0
+ FILEFLAGSMASK VS_FFI_FILEFLAGSMASK
+ FILEFLAGS 0
+ FILEOS VOS_NT_WINDOWS32
+ FILETYPE VFT_APP
+ FILESUBTYPE 0
+BEGIN
+    BLOCK "StringFileInfo"
+    BEGIN
+        BLOCK "040904b0"
+        BEGIN
+            VALUE "CompanyName", "AeGO Flash test suite\0"
+            VALUE "FileDescription", "AeGO Flash test host\0"
+            VALUE "FileVersion", AE_TEST_VERSION "\0"
+            VALUE "InternalName", "AeGO Flash CachedHostSmoke\0"
+            VALUE "OriginalFilename", "AfterFX.exe\0"
+            VALUE "ProductName", "AeGO Flash test host\0"
+            VALUE "ProductVersion", AE_TEST_VERSION "\0"
+            VALUE "Comments", "Unsigned integration-test fixture; not Adobe After Effects.\0"
+        END
+    END
+    BLOCK "VarFileInfo"
+    BEGIN
+        VALUE "Translation", 0x0409, 1200
+    END
+END

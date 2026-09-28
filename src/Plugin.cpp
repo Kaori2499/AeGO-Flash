@@ -12,6 +12,7 @@
 #include "AudioEnvelope.h"
 #include "UiText.h"
 #include "HostText.h"
+#include "HostProcess.h"
 #ifndef L2DAE_IMPORT_PREFERENCES_HEADER
 #define L2DAE_IMPORT_PREFERENCES_HEADER "ImportPreferences.h"
 #endif
@@ -38,20 +39,35 @@ namespace l2dae {
 namespace {
 #include "PathBank.inc"
 
-// Set once by host discovery before parameter setup. Reads remain safe for MFR.
+// Registration can be skipped when AE reuses cached plug-in metadata. Resolve
+// the running host independently before any native text is exposed to AE.
+// Render threads only read the published code page; they never query host APIs.
 std::atomic<UINT> gHostCodePage{CP_UTF8};
 HostVersion gHostVersion{};
+char gHostLanguage[PF_APP_LANG_TAG_SIZE]{};
+std::mutex gHostTextMutex;
 void initializeHostText(SPBasicSuite* basic, const char* version = nullptr) noexcept {
-    if (version) gHostVersion = parseHostVersion(version);
-    char language[64]{};
-    if (basic && basic->AcquireSuite && basic->ReleaseSuite) {
-        const PFAppSuite6* app = nullptr;
-        if (!basic->AcquireSuite(kPFAppSuite, kPFAppSuiteVersion6, reinterpret_cast<const void**>(&app)) && app) {
-            if (app->PF_AppGetLanguage) (void)app->PF_AppGetLanguage(language);
-            (void)basic->ReleaseSuite(kPFAppSuite, kPFAppSuiteVersion6);
+    try {
+        const auto processVersion = currentProcessHostVersion();
+        const auto registrationVersion = parseHostVersion(version);
+        char language[PF_APP_LANG_TAG_SIZE]{};
+        bool languageValid = false;
+        if (basic && basic->AcquireSuite && basic->ReleaseSuite) {
+            const PFAppSuite6* app = nullptr;
+            if (!basic->AcquireSuite(kPFAppSuite, kPFAppSuiteVersion6, reinterpret_cast<const void**>(&app))) {
+                languageValid = app && app->PF_AppGetLanguage && !app->PF_AppGetLanguage(language) &&
+                    language[0] && std::memchr(language, '\0', sizeof(language));
+                (void)basic->ReleaseSuite(kPFAppSuite, kPFAppSuiteVersion6);
+            }
         }
+        const std::lock_guard<std::mutex> guard(gHostTextMutex);
+        if (processVersion.valid) gHostVersion = processVersion;
+        else if (registrationVersion.valid) gHostVersion = registrationVersion;
+        if (languageValid) std::memcpy(gHostLanguage, language, sizeof(gHostLanguage));
+        gHostCodePage.store(hostTextCodePage(gHostVersion, gHostLanguage), std::memory_order_relaxed);
+    } catch (...) {
+        // Failed optional discovery must not destroy a previously valid context.
     }
-    gHostCodePage.store(hostTextCodePage(gHostVersion, language), std::memory_order_relaxed);
 }
 std::string hostText(const wchar_t* text) {
     return encodeHostText(text, gHostCodePage.load(std::memory_order_relaxed));
@@ -607,8 +623,9 @@ extern "C" DllExport PF_Err EffectMain(PF_Cmd cmd, PF_InData* in_data, PF_OutDat
     try {
         switch (cmd) {
         case PF_Cmd_ABOUT:
+            initializeHostText(in_data ? in_data->pica_basicP : nullptr);
             std::snprintf(out_data->return_msg, sizeof(out_data->return_msg),
-                "%s", hostText(L"AeGO Flash 1.0.0\r导入模型后，可预览并导入动作与表情。\r"
+                "%s", hostText(L"AeGO Flash 1.0.1\r导入模型后，可预览并导入动作与表情。\r"
                 L"呼吸与眨眼支持参数调节和关键帧。\r"
                 L"选择音频图层，启用声音同步口型。\r"
                 L"使用外部模型文件；8 位渲染，可输出至 8/16 位合成。").c_str());
@@ -627,6 +644,7 @@ extern "C" DllExport PF_Err EffectMain(PF_Cmd cmd, PF_InData* in_data, PF_OutDat
             releaseRenderer();
             return PF_Err_NONE;
         case PF_Cmd_PARAMS_SETUP:
+            initializeHostText(in_data ? in_data->pica_basicP : nullptr);
             return setupParameters(in_data, out_data);
         case PF_Cmd_USER_CHANGED_PARAM:
             if (extra && static_cast<PF_UserChangedParamExtra*>(extra)->param_index == kImportExpression)

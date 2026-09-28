@@ -1,0 +1,9 @@
+Cold host AE 24.0, CP936, PF API 13.29, first selector GLOBAL_SETUP; registration is never looked up or invoked.
+FAIL: parameter/group label encoding mismatch: expected CP936 bytes [b5 bc c8 eb c4 a3 d0 cd ]; actual [e5 af bc e5 85 a5 e6 a8 a1 e5 9e 8b ] (after 80 checks; 0 live handles, 0 live suites)
+EXPECTED FAILURE: 24_0 old release emits incorrect Chinese bytes without registration.
+Cold host AE 25.3, CP936, PF API 13.29, first selector GLOBAL_SETUP; registration is never looked up or invoked.
+FAIL: parameter/group label encoding mismatch: expected CP936 bytes [b5 bc c8 eb c4 a3 d0 cd ]; actual [e5 af bc e5 85 a5 e6 a8 a1 e5 9e 8b ] (after 80 checks; 0 live handles, 0 live suites)
+EXPECTED FAILURE: 25_3 old release emits incorrect Chinese bytes without registration.
+Cold host AE 25.6, CP936, PF API 13.29, first selector GLOBAL_SETUP; registration is never looked up or invoked.
+FAIL: parameter/group label encoding mismatch: expected CP936 bytes [b5 bc c8 eb c4 a3 d0 cd ]; actual [e5 af bc e5 85 a5 e6 a8 a1 e5 9e 8b ] (after 80 checks; 0 live handles, 0 live suites)
+EXPECTED FAILURE: 25_6 old release emits incorrect Chinese bytes without registration.

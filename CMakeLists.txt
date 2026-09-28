@@ -3,7 +3,7 @@ cmake_policy(SET CMP0091 NEW)
 set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
 option(BUILD_AE_PLUGIN "Build the AEX plugin (requires Adobe SDK)" ON)
 option(USE_ADOBE_PIPL_TOOL "Regenerate PiPL through the optional Adobe PiPLtool instead of the authored RC resource" OFF)
-project(AeGOFlash VERSION 1.0.0 LANGUAGES CXX)
+project(AeGOFlash VERSION 1.0.1 LANGUAGES CXX)
 
 if(NOT WIN32 OR NOT MSVC OR NOT CMAKE_SIZEOF_VOID_P EQUAL 8)
     message(FATAL_ERROR "AeGO Flash requires Windows x64 and Visual Studio 2022 (v143).")
@@ -98,7 +98,7 @@ target_include_directories(Live2DNativeAE PRIVATE
     "${AE_SDK_ROOT}/Examples/Util")
 target_compile_definitions(Live2DNativeAE PRIVATE _WINDOWS MSWindows)
 target_compile_options(Live2DNativeAE PRIVATE /utf-8 /W4 /EHsc)
-target_link_libraries(Live2DNativeAE PRIVATE Live2DRenderer Live2DAudioEnvelope comdlg32 user32 gdi32)
+target_link_libraries(Live2DNativeAE PRIVATE Live2DRenderer Live2DAudioEnvelope comdlg32 user32 gdi32 version)
 
 add_custom_command(TARGET Live2DNativeAE POST_BUILD
     COMMAND "${CMAKE_COMMAND}" -E copy_directory
@@ -113,6 +113,12 @@ endif()
 option(BUILD_TESTING "Build the native model, AE adapter and hidden-dialog acceptance tests" ON)
 if(BUILD_TESTING)
     enable_testing()
+    add_executable(Live2DHostProcessTest tests/HostProcess.test.cpp)
+    target_include_directories(Live2DHostProcessTest PRIVATE src)
+    target_compile_options(Live2DHostProcessTest PRIVATE /utf-8 /W4 /EHsc)
+    target_link_libraries(Live2DHostProcessTest PRIVATE version)
+    add_test(NAME HostProcessVersion COMMAND Live2DHostProcessTest)
+    set_tests_properties(HostProcessVersion PROPERTIES TIMEOUT 30)
     add_executable(Live2DImportPreferencesTest tests/ImportPreferences.test.cpp)
     target_include_directories(Live2DImportPreferencesTest PRIVATE src)
     target_compile_options(Live2DImportPreferencesTest PRIVATE /utf-8 /W4 /EHsc)
@@ -161,6 +167,30 @@ if(BUILD_TESTING)
     target_link_libraries(Live2DDialogPreview PRIVATE Live2DRenderer comdlg32 user32 gdi32)
 
     if(BUILD_AE_PLUGIN)
+        # Each executable is a separate cold process with numeric AE host
+        # version resources. No discovery entry is called: this exercises the
+        # same missing-registration state as a cached plug-in load.
+        foreach(host_spec IN ITEMS 22_0 24_0 25_3 25_6 26_3)
+            string(REPLACE "_" ";" host_parts "${host_spec}")
+            list(GET host_parts 0 host_major)
+            list(GET host_parts 1 host_minor)
+            set(host_target "Live2DCachedHost_${host_spec}")
+            add_executable(${host_target} tests/CachedHostSmoke.cpp tests/CachedHostVersion.rc)
+            set_target_properties(${host_target} PROPERTIES OUTPUT_NAME "AfterFX"
+                RUNTIME_OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/cached-hosts/${host_spec}")
+            target_include_directories(${host_target} PRIVATE src
+                "${AE_SDK_ROOT}/Examples/Headers" "${AE_SDK_ROOT}/Examples/Headers/SP"
+                "${AE_SDK_ROOT}/Examples/Util")
+            target_compile_definitions(${host_target} PRIVATE _WINDOWS MSWindows UNICODE _UNICODE
+                AE_TEST_HOST_MAJOR=${host_major} AE_TEST_HOST_MINOR=${host_minor})
+            target_compile_options(${host_target} PRIVATE /utf-8 /W4 /EHsc)
+            target_link_libraries(${host_target} PRIVATE version)
+            foreach(first_selector IN ITEMS global params about)
+                add_test(NAME CachedHost_${host_spec}_${first_selector}
+                    COMMAND ${host_target} "$<TARGET_FILE:Live2DNativeAE>" "${first_selector}")
+                set_tests_properties(CachedHost_${host_spec}_${first_selector} PROPERTIES TIMEOUT 30)
+            endforeach()
+        endforeach()
         # Load the actual AEX and call its exports through official SDK types.
         # The optional model additionally exercises the full native rendering path.
         add_executable(Live2DAdapterSmoke tests/AdapterSmoke.cpp src/TimelineHost.cpp)
@@ -192,7 +222,7 @@ if(BUILD_TESTING)
         target_compile_options(Live2DImportCommitSmoke PRIVATE /utf-8 /W4 /EHsc)
         # Match AfterFX.exe's 8 MiB host stack for this in-process fixture.
         target_link_options(Live2DImportCommitSmoke PRIVATE /STACK:8388608)
-        target_link_libraries(Live2DImportCommitSmoke PRIVATE Live2DAudioEnvelope)
+        target_link_libraries(Live2DImportCommitSmoke PRIVATE Live2DAudioEnvelope version)
         add_test(NAME ImportCommitOwnership COMMAND Live2DImportCommitSmoke)
         set_tests_properties(ImportCommitOwnership PROPERTIES TIMEOUT 30)
 

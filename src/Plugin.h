@@ -65,9 +65,9 @@ constexpr A_long kParameterDiskIds[kParameterCount] = {
 // callback IDs are A_short, so keep this ID below 32768.
 constexpr A_short kSelectionDiskId = 102;
 constexpr A_short kExpressionDiskId = 117;
-// AeGO Flash public 1.0.0 uses a separate monotonic AE compatibility version.
+// AeGO Flash public 1.0.1 uses a separate monotonic AE compatibility version.
 // Match name, disk IDs and saved data stay stable across the product rename.
-constexpr A_u_long kPluginVersion = PF_VERSION(1, 13, 0, PF_Stage_RELEASE, 1);
+constexpr A_u_long kPluginVersion = PF_VERSION(1, 13, 1, PF_Stage_RELEASE, 1);
 // AE 22.0 introduced API 13.27. Keep discovery compatible with that host.
 constexpr A_long kMinimumApiMajor = 13;
 constexpr A_long kMinimumApiMinor = 27;
@@ -78,7 +78,7 @@ constexpr PF_OutFlags kOutputFlags = PF_OutFlag_DEEP_COLOR_AWARE |
 // No sequence_data is used, so MFR needs neither mutable nor flattened sequence flags.
 constexpr PF_OutFlags2 kOutputFlags2 = PF_OutFlag2_REVEALS_ZERO_ALPHA |
     PF_OutFlag2_SUPPORTS_THREADED_RENDERING | PF_OutFlag2_PARAM_GROUP_START_COLLAPSED_FLAG;
-static_assert(kPluginVersion == 951809 && kOutputFlags == 0x02100406 && kOutputFlags2 == 0x08000088,
+static_assert(kPluginVersion == 953857 && kOutputFlags == 0x02100406 && kOutputFlags2 == 0x08000088,
     "Keep PluginPiPL.rc and PluginPiPL.r in sync with the SDK flags and version.");
 }
 

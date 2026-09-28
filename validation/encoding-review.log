@@ -1,0 +1,6 @@
+Cold integration hosts: 22.0, 24.0, 25.3, 25.6 and 26.3, each in a fresh process with its own fixed numeric VERSIONINFO.
+GLOBAL_SETUP, PARAMS_SETUP and ABOUT were each tested as the first callback. Only EffectMain was resolved; no registration export was looked up or invoked.
+The previous packaged binary reproduced UTF-8 instead of CP936 on 24.0/25.3/25.6; the fixed binary passed all 15 version/entry cases.
+Checked exact Chinese label, button, checkbox, popup, About and error bytes, plus retained pointers and balanced handles/suites after language-query failures.
+Only the real installed AE 26.3 executable metadata was read. These are independent test hosts, not Adobe applications; actual AE 2024/2025 installation, restart and saved-project acceptance remain pending.
+No user project or preference was modified.

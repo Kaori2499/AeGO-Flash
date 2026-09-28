@@ -114,11 +114,18 @@ static A_Err legacyRegistration(PF_PluginDataPtr data, const A_u_char* name,
 using Effect = PF_Err(*)(PF_Cmd, PF_InData*, PF_OutData*, PF_ParamDef**, PF_LayerDef*, void*);
 namespace encodingMock {
 static int references = 0;
-static PF_Err language(A_char* text) { std::memcpy(text, "zh_CN", 6); return PF_Err_NONE; }
+static bool failAcquire = false, failLanguage = false;
+static unsigned failedAcquires = 0, failedLanguageCalls = 0;
+static PF_Err language(A_char* text) {
+    std::memcpy(text, failLanguage ? "en_US" : "zh_CN", 6);
+    if (failLanguage) { ++failedLanguageCalls; return PF_Err_INVALID_CALLBACK; }
+    return PF_Err_NONE;
+}
 static PFAppSuite6 appSuite = [] { PFAppSuite6 suite{}; suite.PF_AppGetLanguage = language; return suite; }();
 static SPErr acquire(const char* name, int32 version, const void** suite) {
     *suite = nullptr;
     if (std::strcmp(name, kPFAppSuite) || version != kPFAppSuiteVersion6) return 1;
+    if (failAcquire) { ++failedAcquires; return 1; }
     *suite = &appSuite; ++references; return 0;
 }
 static SPErr release(const char* name, int32 version) {
@@ -161,12 +168,14 @@ static void run(Effect effect, PluginDataEntryFunctionPtr legacy, PluginDataEntr
     struct Retained { const char* text; std::string bytes; };
     std::vector<Retained> retained;
     struct Case { const char* version; bool oldEntry; bool legacyEncoding; };
-    for (const auto& test : std::array<Case, 5>{{
+    for (const auto& test : std::array<Case, 8>{{
             {"22.0.0", true, true}, {"26.3x87", false, false}, {"22.6", false, true},
+            {"24.0", false, true}, {"25.3", true, true}, {"25.6", false, true},
             {"26.3x87", true, false}, {"unknown-host", false, false}}}) {
+        failAcquire = failLanguage = false;
         require((test.oldEntry ? legacy(nullptr, legacyRegistration, &basic, "After Effects", test.version) :
             modern(nullptr, registration, &basic, "After Effects", test.version)) == 0,
-            "both actual DLL discovery entries accept AE22/API13.27 and modern hosts");
+            "both actual DLL discovery entries accept AE22/24/25 legacy text and AE26 UTF-8 hosts");
         const UINT page = test.legacyEncoding && GetOEMCP() != CP_UTF8 ? 936 : CP_UTF8;
         PF_OutData out{};
         require(effect(PF_Cmd_GLOBAL_SETUP, &in, &out, nullptr, nullptr, nullptr) == 0, "encoding probe global setup");
@@ -179,32 +188,55 @@ static void run(Effect effect, PluginDataEntryFunctionPtr legacy, PluginDataEntr
         require(decode(out.return_msg, page) == L"AeGO Flash: 可用内存不足。请降低合成尺寸或释放内存后重试。",
             "Chinese error message survives the selected host encoding exactly");
         require(allocations.empty(), "failed setup does not leak host allocations");
-        parameters.assign(1, PF_ParamDef{});
-        require(effect(PF_Cmd_PARAMS_SETUP, &in, &out, nullptr, nullptr, nullptr) == 0 && parameters.size() == kParameterCount,
-            "encoding probe creates every real parameter and group");
-        for (const auto& label : labels) {
-            require(decode(parameters[label.index].PF_DEF_NAME, page) == label.text, "all saved and grouped labels decode exactly");
-            require(std::strlen(parameters[label.index].PF_DEF_NAME) < 32, "host parameter name fits without multibyte truncation");
-        }
-        const auto pointer = [&](const char* text, const wchar_t* expected) {
-            require(text && decode(text, page) == expected, "persistent button/checkbox/popup text is valid after setup returns");
-            retained.push_back({text, text});
+        const auto verifyUi = [&] {
+            parameters.assign(1, PF_ParamDef{});
+            require(effect(PF_Cmd_PARAMS_SETUP, &in, &out, nullptr, nullptr, nullptr) == 0 && parameters.size() == kParameterCount,
+                "encoding probe creates every real parameter and group");
+            for (const auto& label : labels) {
+                require(decode(parameters[label.index].PF_DEF_NAME, page) == label.text, "all saved and grouped labels decode exactly");
+                require(std::strlen(parameters[label.index].PF_DEF_NAME) < 32, "host parameter name fits without multibyte truncation");
+            }
+            const auto pointer = [&](const char* text, const wchar_t* expected) {
+                require(text && decode(text, page) == expected, "persistent button/checkbox/popup text is valid after setup returns");
+                retained.push_back({text, text});
+            };
+            pointer(parameters[kOpenDialog].u.button_d.u.namesptr, L"导入模型…");
+            pointer(parameters[kImportExpression].u.button_d.u.namesptr, L"导入动作与表情…");
+            for (auto index : {kLoop, kManualTime, kLipSync, kBreathing, kAutoBlink})
+                pointer(parameters[index].u.bd.u.nameptr, L"启用");
+            for (auto index : {kMotionA, kMotionB, kExpressionA, kExpressionB})
+                pointer(parameters[index].u.pd.u.namesptr, L"槽位 1|槽位 2|槽位 3|槽位 4|槽位 5|槽位 6|槽位 7|槽位 8");
+            require(effect(PF_Cmd_ABOUT, &in, &out, nullptr, nullptr, nullptr) == 0, "localized About callback");
+            const auto about = decode(out.return_msg, page);
+            require(about.find(L"AeGO Flash 1.0.1") == 0 && about.find(L"选择音频图层，启用声音同步口型。") != std::wstring::npos,
+                "About body decodes correctly with the public version");
+            for (auto index : {kSelection, kExpressionSelection}) {
+                PF_ArbParamsExtra extra{}; extra.id = static_cast<A_short>(parameters[index].uu.id);
+                extra.which_function = PF_Arbitrary_DISPOSE_FUNC;
+                extra.u.dispose_func_params.arbH = parameters[index].u.arb_d.dephault;
+                require(effect(PF_Cmd_ARBITRARY_CALLBACK, &in, &out, nullptr, nullptr, &extra) == 0, "encoding probe releases default bank");
+            }
+            parameters.assign(1, PF_ParamDef{});
+            require(allocations.empty() && references == 0, "every UI snapshot balances optional suites and host allocations");
         };
-        pointer(parameters[kOpenDialog].u.button_d.u.namesptr, L"导入模型…");
-        pointer(parameters[kImportExpression].u.button_d.u.namesptr, L"导入动作与表情…");
-        for (auto index : {kLoop, kManualTime, kLipSync, kBreathing, kAutoBlink})
-            pointer(parameters[index].u.bd.u.nameptr, L"启用");
-        for (auto index : {kMotionA, kMotionB, kExpressionA, kExpressionB})
-            pointer(parameters[index].u.pd.u.namesptr, L"槽位 1|槽位 2|槽位 3|槽位 4|槽位 5|槽位 6|槽位 7|槽位 8");
-        require(effect(PF_Cmd_ABOUT, &in, &out, nullptr, nullptr, nullptr) == 0, "localized About callback");
-        const auto about = decode(out.return_msg, page);
-        require(about.find(L"AeGO Flash 1.0.0") == 0 && about.find(L"选择音频图层，启用声音同步口型。") != std::wstring::npos,
-            "About body decodes correctly with the public version");
-        for (auto index : {kSelection, kExpressionSelection}) {
-            PF_ArbParamsExtra extra{}; extra.id = static_cast<A_short>(parameters[index].uu.id);
-            extra.which_function = PF_Arbitrary_DISPOSE_FUNC;
-            extra.u.dispose_func_params.arbH = parameters[index].u.arb_d.dephault;
-            require(effect(PF_Cmd_ARBITRARY_CALLBACK, &in, &out, nullptr, nullptr, &extra) == 0, "encoding probe releases default bank");
+        verifyUi();
+        if (std::strcmp(test.version, "unknown-host")) {
+            require((test.oldEntry ? legacy(nullptr, legacyRegistration, &basic, "After Effects", "not-a-version") :
+                modern(nullptr, registration, &basic, "After Effects", "not-a-version")) == 0,
+                "malformed registration hints are non-fatal after a valid host version");
+            verifyUi(); // A bad hint must not replace the known encoding context.
+            const auto acquireFailuresBefore = failedAcquires;
+            failAcquire = true;
+            verifyUi();
+            failAcquire = false;
+            require(failedAcquires >= acquireFailuresBefore + 2 && references == 0,
+                "About and Params preserve known Chinese context when language-suite acquisition fails");
+            const auto languageFailuresBefore = failedLanguageCalls;
+            failLanguage = true;
+            verifyUi();
+            failLanguage = false;
+            require(failedLanguageCalls >= languageFailuresBefore + 2 && references == 0,
+                "failing language callbacks cannot replace known context with their en_US output and release all suites");
         }
         require(effect(PF_Cmd_GLOBAL_SETDOWN, &in, &out, nullptr, nullptr, nullptr) == 0, "encoding probe global teardown");
         parameters.assign(1, PF_ParamDef{});
@@ -212,7 +244,7 @@ static void run(Effect effect, PluginDataEntryFunctionPtr legacy, PluginDataEntr
         for (const auto& saved : retained)
             require(std::strcmp(saved.text, saved.bytes.c_str()) == 0, "registering another host encoding does not invalidate retained UI text pointers");
     }
-    std::cout << "PASS: actual DLL legacy/modern discovery; AE22 Chinese and AE26/unknown UTF-8 labels, button/checkbox/popup text, About and error bytes; retained pointer lifetimes.\n";
+    std::cout << "PASS: actual DLL legacy/modern discovery; AE22/24/25 Chinese and AE26/unknown UTF-8 labels, button/checkbox/popup text, About and error bytes; malformed hints and optional language failures preserve established context; retained pointer lifetimes.\n";
 }
 }
 namespace audioMock {
@@ -672,14 +704,14 @@ int wmain(int argc, wchar_t** argv) {
         require(reg(nullptr, registration, nullptr, "After Effects", "26.5") == 0, "restore modern registration after legacy encoding probes");
         PF_OutData out{};
         require(effect(PF_Cmd_GLOBAL_SETUP, &in, &out, nullptr, nullptr, nullptr) == 0, "global setup");
-        require(out.out_flags == 0x02100406 && out.out_flags2 == 0x08000088 && out.my_version == 951809, "runtime/PiPL flags agree");
+        require(out.out_flags == 0x02100406 && out.out_flags2 == 0x08000088 && out.my_version == 953857, "runtime/PiPL flags agree");
         require((out.out_flags2 & PF_OutFlag2_SUPPORTS_THREADED_RENDERING) &&
             !(out.out_flags2 & (PF_OutFlag2_SUPPORTS_SMART_RENDER | PF_OutFlag2_FLOAT_COLOR_AWARE |
                 PF_OutFlag2_MUTABLE_RENDER_SEQUENCE_DATA_SLOWER)) &&
             !(out.out_flags & PF_OutFlag_SEQUENCE_DATA_NEEDS_FLATTENING),
             "legacy RENDER opts into MFR without claiming SmartFX, float or mutable sequence data");
-        require(PF_Version_STAGE(out.my_version) == PF_Stage_RELEASE && out.my_version > 919041,
-            "AeGO Flash 1.0.0 is a release with an AE compatibility version newer than all pre-brand releases");
+        require(PF_Version_STAGE(out.my_version) == PF_Stage_RELEASE && out.my_version > 951809,
+            "AeGO Flash 1.0.1 is a release with an AE compatibility version monotonically increasing for saved-project compatibility");
         capturedImportTransitionRegistration = false;
         require(effect(PF_Cmd_PARAMS_SETUP, &in, &out, nullptr, nullptr, nullptr) == 0, "parameter setup");
         require(out.num_params == 46 && parameters.size() == 46 && kParameterCount == 46,

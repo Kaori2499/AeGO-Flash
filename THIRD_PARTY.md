@@ -1,4 +1,4 @@
-# AeGO Flash 第三方组件与许可
+# AeGO Flash 1.0.1 第三方组件与许可
 
 安装包中的 `AeGOFlash.aex` 静态链接 Live2D Cubism Core 和 Framework，并附带 Framework 着色器。源码包不包含完整 SDK 或用户模型。
 

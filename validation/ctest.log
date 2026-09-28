@@ -9,81 +9,220 @@ Added 0 tests to meet fixture requirements
 Checking test dependency graph...
 Checking test dependency graph end
 test 1
-    Start 1: ImportPreferences
+      Start  1: HostProcessVersion
 
-1: Test command: C:\Users\36931\Documents\Codex\2026-09-27\ae\work\aebuild\Live2DImportPreferencesTest.exe "C:/Users/36931/Documents/Codex/2026-09-27/ae/work/aebuild/preference-test-workspace"
+1: Test command: C:\Users\36931\Documents\Codex\2026-09-27\ae\work\aebuild\Live2DHostProcessTest.exe
 1: Working Directory: C:/Users/36931/Documents/Codex/2026-09-27/ae/work/aebuild
 1: Test timeout computed to be: 30
-1: Concurrent diagnostics: saveFailures=0 lastSaveError=0 sessionFailures=0 openFailures=0 lastOpenError=0 readFailures=0 lastReadError=0 malformedRecords=0
-1: Atomic persistence: 96 saves, 12099 complete concurrent snapshots.
-1: PASS: 174 import preference assertions; default 5, cross-session 3/4/5, corruption, Unicode paths, write-failure session fallback and atomic concurrency. Real user preferences untouched.
-1/7 Test #1: ImportPreferences ................   Passed    0.44 sec
-test 2
-    Start 2: HostTextCompatibility
-
-2: Test command: C:\Users\36931\Documents\Codex\2026-09-27\ae\work\aebuild\Live2DHostTextTest.exe
-2: Working Directory: C:/Users/36931/Documents/Codex/2026-09-27/ae/work/aebuild
-2: Test timeout computed to be: 30
-2: PASS: 447 host text compatibility checks; AE22-26 version boundary, CP936/UTF-8, loss detection and bounded fields.
-2/7 Test #2: HostTextCompatibility ............   Passed    0.04 sec
+1: PASS: 41 runtime host-version checks; numeric product/file fallback, invalid resources, exact process-name boundary and cached non-host rejection. All file access was read-only.
+ 1/21 Test  #1: HostProcessVersion ...............   Passed    0.05 sec
 test 3
-    Start 3: ChineseUiMessages
+      Start  3: HostTextCompatibility
 
-3: Test command: C:\Users\36931\Documents\Codex\2026-09-27\ae\work\aebuild\Live2DUiTextTest.exe
+3: Test command: C:\Users\36931\Documents\Codex\2026-09-27\ae\work\aebuild\Live2DHostTextTest.exe
 3: Working Directory: C:/Users/36931/Documents/Codex/2026-09-27/ae/work/aebuild
 3: Test timeout computed to be: 30
-3: PASS: 166 UI error localization checks; Unicode paths/curve IDs, diagnostics, idempotence and fixed UTF-8 fields.
-3/7 Test #3: ChineseUiMessages ................   Passed    0.04 sec
-test 6
-    Start 6: DialogMotionSearch
+3: PASS: 447 host text compatibility checks; AE22-26 version boundary, CP936/UTF-8, loss detection and bounded fields.
+ 2/21 Test  #3: HostTextCompatibility ............   Passed    0.01 sec
+test 4
+      Start  4: ChineseUiMessages
 
-6: Test command: C:\Users\36931\Documents\Codex\2026-09-27\ae\work\aebuild\Live2DDialogSmoke.exe
-6: Working Directory: C:/Users/36931/Documents/Codex/2026-09-27/ae/work/aebuild
-6: Test timeout computed to be: 30
-6: PASS 661 checks: combined picker, dynamic assets, preview scheduling and cleanup
-4/7 Test #6: DialogMotionSearch ...............   Passed    0.28 sec
-test 7
-    Start 7: AdapterCallbacks
-
-7: Test command: C:\Users\36931\Documents\Codex\2026-09-27\ae\work\aebuild\Live2DAdapterSmoke.exe "C:/Users/36931/Documents/Codex/2026-09-27/ae/work/aebuild/AeGOFlash.aex" "C:/Users/36931/Documents/Codex/2026-09-27/ae/work/deps/CubismSdkForNative-5-r.5/Samples/Resources/Haru/Haru.model3.json"
-7: Working Directory: C:/Users/36931/Documents/Codex/2026-09-27/ae/work/aebuild
-7: Test timeout computed to be: 120
-7: PASS: actual DLL legacy/modern discovery; AE22 Chinese and AE26/unknown UTF-8 labels, button/checkbox/popup text, About and error bytes; retained pointer lifetimes.
-7: Native model rendered through actual AEX: 1904 visible pixels, 14480 transparent pixels; 8/16-bpc channel/range agreement.
-7: PASS: eight-slot selection, independent keyed A/B time, old automatic timing, transition endpoints/intermediate/symmetry and reverse seeking.
-7: PASS: actual AEX independent breathing/blinking keys; host clock independent of A/B time, speed and start; combined operation, reverse seeking, missing values and exact disabled restoration.
-7: PASS: actual AEX expression pixels, independent A/B weights, inactive missing-file skip, weight fades/clamps, deterministic seeking and AE8/AE16 agreement.
-7: PASS: native audio selector; PCM16 stereo checkout; exact 160ms negative/coarse/rational time windows; error/cancellation cleanup; real AEX mouth pixels, silence, sensitivity, 8/16-bpc and motion/expression restoration.
-7: PASS: actual AEX 4/8-thread concurrent calls; independent evaluated parameters/audio/outputs; shared read-only banks and concurrent copy/flatten/dispose; serial-identical 8/16-bpc pixels; cancellation recovery; no render AEGP access.
-7: PASS: deferred native timeline bridge, JSON escaping, idle reentrancy, strict script result/errors, lifecycle and handle cleanup (mock AEGP).
-7: PASS: 43218 checks; actual AEX loading/registration; 11 callbacks for each independent motion/expression bank; v1/v2 motion migration; eight-slot Unicode save/copy/clipboard; malformed input; 8/16-bpc render; no handle leaks.
-5/7 Test #7: AdapterCallbacks .................   Passed    7.75 sec
+4: Test command: C:\Users\36931\Documents\Codex\2026-09-27\ae\work\aebuild\Live2DUiTextTest.exe
+4: Working Directory: C:/Users/36931/Documents/Codex/2026-09-27/ae/work/aebuild
+4: Test timeout computed to be: 30
+4: PASS: 166 UI error localization checks; Unicode paths/curve IDs, diagnostics, idempotence and fixed UTF-8 fields.
+ 3/21 Test  #4: ChineseUiMessages ................   Passed    0.01 sec
 test 8
-    Start 8: ImportCommitOwnership
+      Start  8: CachedHost_22_0_global
 
-8: Test command: C:\Users\36931\Documents\Codex\2026-09-27\ae\work\aebuild\Live2DImportCommitSmoke.exe
+8: Test command: C:\Users\36931\Documents\Codex\2026-09-27\ae\work\aebuild\cached-hosts\22_0\AfterFX.exe "C:/Users/36931/Documents/Codex/2026-09-27/ae/work/aebuild/AeGOFlash.aex" "global"
 8: Working Directory: C:/Users/36931/Documents/Codex/2026-09-27/ae/work/aebuild
 8: Test timeout computed to be: 30
-8: PASS: 707 production import/storage/audio/ambient checks; isolated in-memory preferences; new thirty-frame and old fifteen-frame defaults; confirmed motion preference commits; paired1024-entry banks; fixed borrowed handles; immutable snapshots; transactional cancellation/errors; legacy migration; dynamic index routing; simplified blink UI and legacy ambient values.
-6/7 Test #8: ImportCommitOwnership ............   Passed    0.18 sec
+8: Cold host AE 22.0, CP936, PF API 13.29, first selector GLOBAL_SETUP; registration is never looked up or invoked.
+8: PASS: 3510 checks; all Chinese parameter/group labels, buttons, checkboxes, popups, About and real error bytes; retained text pointers; 12/12 handles and 19/19 suites balanced. This is a versioned AeGO Flash test process, not an actual Adobe host.
+ 4/21 Test  #8: CachedHost_22_0_global ...........   Passed    0.08 sec
 test 9
-    Start 9: TimelineImportGuard
+      Start  9: CachedHost_22_0_params
 
-9: Test command: C:\Users\36931\Documents\Codex\2026-09-27\ae\work\aebuild\Live2DTimelineGuardSmoke.exe
+9: Test command: C:\Users\36931\Documents\Codex\2026-09-27\ae\work\aebuild\cached-hosts\22_0\AfterFX.exe "C:/Users/36931/Documents/Codex/2026-09-27/ae/work/aebuild/AeGOFlash.aex" "params"
 9: Working Directory: C:/Users/36931/Documents/Codex/2026-09-27/ae/work/aebuild
 9: Test timeout computed to be: 30
-9: PASS: 176 timeline import guard checks; AE owner, modal/nested idle, failures, thread and teardown.
-7/7 Test #9: TimelineImportGuard ..............   Passed    0.06 sec
+9: Cold host AE 22.0, CP936, PF API 13.29, first selector PARAMS_SETUP; registration is never looked up or invoked.
+9: PASS: 3510 checks; all Chinese parameter/group labels, buttons, checkboxes, popups, About and real error bytes; retained text pointers; 12/12 handles and 19/19 suites balanced. This is a versioned AeGO Flash test process, not an actual Adobe host.
+ 5/21 Test  #9: CachedHost_22_0_params ...........   Passed    0.02 sec
+test 10
+      Start 10: CachedHost_22_0_about
+
+10: Test command: C:\Users\36931\Documents\Codex\2026-09-27\ae\work\aebuild\cached-hosts\22_0\AfterFX.exe "C:/Users/36931/Documents/Codex/2026-09-27/ae/work/aebuild/AeGOFlash.aex" "about"
+10: Working Directory: C:/Users/36931/Documents/Codex/2026-09-27/ae/work/aebuild
+10: Test timeout computed to be: 30
+10: Cold host AE 22.0, CP936, PF API 13.29, first selector ABOUT; registration is never looked up or invoked.
+10: PASS: 3521 checks; all Chinese parameter/group labels, buttons, checkboxes, popups, About and real error bytes; retained text pointers; 12/12 handles and 20/20 suites balanced. This is a versioned AeGO Flash test process, not an actual Adobe host.
+ 6/21 Test #10: CachedHost_22_0_about ............   Passed    0.02 sec
+test 11
+      Start 11: CachedHost_24_0_global
+
+11: Test command: C:\Users\36931\Documents\Codex\2026-09-27\ae\work\aebuild\cached-hosts\24_0\AfterFX.exe "C:/Users/36931/Documents/Codex/2026-09-27/ae/work/aebuild/AeGOFlash.aex" "global"
+11: Working Directory: C:/Users/36931/Documents/Codex/2026-09-27/ae/work/aebuild
+11: Test timeout computed to be: 30
+11: Cold host AE 24.0, CP936, PF API 13.29, first selector GLOBAL_SETUP; registration is never looked up or invoked.
+11: PASS: 3510 checks; all Chinese parameter/group labels, buttons, checkboxes, popups, About and real error bytes; retained text pointers; 12/12 handles and 19/19 suites balanced. This is a versioned AeGO Flash test process, not an actual Adobe host.
+ 7/21 Test #11: CachedHost_24_0_global ...........   Passed    0.02 sec
+test 12
+      Start 12: CachedHost_24_0_params
+
+12: Test command: C:\Users\36931\Documents\Codex\2026-09-27\ae\work\aebuild\cached-hosts\24_0\AfterFX.exe "C:/Users/36931/Documents/Codex/2026-09-27/ae/work/aebuild/AeGOFlash.aex" "params"
+12: Working Directory: C:/Users/36931/Documents/Codex/2026-09-27/ae/work/aebuild
+12: Test timeout computed to be: 30
+12: Cold host AE 24.0, CP936, PF API 13.29, first selector PARAMS_SETUP; registration is never looked up or invoked.
+12: PASS: 3510 checks; all Chinese parameter/group labels, buttons, checkboxes, popups, About and real error bytes; retained text pointers; 12/12 handles and 19/19 suites balanced. This is a versioned AeGO Flash test process, not an actual Adobe host.
+ 8/21 Test #12: CachedHost_24_0_params ...........   Passed    0.02 sec
+test 13
+      Start 13: CachedHost_24_0_about
+
+13: Test command: C:\Users\36931\Documents\Codex\2026-09-27\ae\work\aebuild\cached-hosts\24_0\AfterFX.exe "C:/Users/36931/Documents/Codex/2026-09-27/ae/work/aebuild/AeGOFlash.aex" "about"
+13: Working Directory: C:/Users/36931/Documents/Codex/2026-09-27/ae/work/aebuild
+13: Test timeout computed to be: 30
+13: Cold host AE 24.0, CP936, PF API 13.29, first selector ABOUT; registration is never looked up or invoked.
+13: PASS: 3521 checks; all Chinese parameter/group labels, buttons, checkboxes, popups, About and real error bytes; retained text pointers; 12/12 handles and 20/20 suites balanced. This is a versioned AeGO Flash test process, not an actual Adobe host.
+ 9/21 Test #13: CachedHost_24_0_about ............   Passed    0.02 sec
+test 14
+      Start 14: CachedHost_25_3_global
+
+14: Test command: C:\Users\36931\Documents\Codex\2026-09-27\ae\work\aebuild\cached-hosts\25_3\AfterFX.exe "C:/Users/36931/Documents/Codex/2026-09-27/ae/work/aebuild/AeGOFlash.aex" "global"
+14: Working Directory: C:/Users/36931/Documents/Codex/2026-09-27/ae/work/aebuild
+14: Test timeout computed to be: 30
+14: Cold host AE 25.3, CP936, PF API 13.29, first selector GLOBAL_SETUP; registration is never looked up or invoked.
+14: PASS: 3510 checks; all Chinese parameter/group labels, buttons, checkboxes, popups, About and real error bytes; retained text pointers; 12/12 handles and 19/19 suites balanced. This is a versioned AeGO Flash test process, not an actual Adobe host.
+10/21 Test #14: CachedHost_25_3_global ...........   Passed    0.02 sec
+test 15
+      Start 15: CachedHost_25_3_params
+
+15: Test command: C:\Users\36931\Documents\Codex\2026-09-27\ae\work\aebuild\cached-hosts\25_3\AfterFX.exe "C:/Users/36931/Documents/Codex/2026-09-27/ae/work/aebuild/AeGOFlash.aex" "params"
+15: Working Directory: C:/Users/36931/Documents/Codex/2026-09-27/ae/work/aebuild
+15: Test timeout computed to be: 30
+15: Cold host AE 25.3, CP936, PF API 13.29, first selector PARAMS_SETUP; registration is never looked up or invoked.
+15: PASS: 3510 checks; all Chinese parameter/group labels, buttons, checkboxes, popups, About and real error bytes; retained text pointers; 12/12 handles and 19/19 suites balanced. This is a versioned AeGO Flash test process, not an actual Adobe host.
+11/21 Test #15: CachedHost_25_3_params ...........   Passed    0.02 sec
+test 16
+      Start 16: CachedHost_25_3_about
+
+16: Test command: C:\Users\36931\Documents\Codex\2026-09-27\ae\work\aebuild\cached-hosts\25_3\AfterFX.exe "C:/Users/36931/Documents/Codex/2026-09-27/ae/work/aebuild/AeGOFlash.aex" "about"
+16: Working Directory: C:/Users/36931/Documents/Codex/2026-09-27/ae/work/aebuild
+16: Test timeout computed to be: 30
+16: Cold host AE 25.3, CP936, PF API 13.29, first selector ABOUT; registration is never looked up or invoked.
+16: PASS: 3521 checks; all Chinese parameter/group labels, buttons, checkboxes, popups, About and real error bytes; retained text pointers; 12/12 handles and 20/20 suites balanced. This is a versioned AeGO Flash test process, not an actual Adobe host.
+12/21 Test #16: CachedHost_25_3_about ............   Passed    0.02 sec
+test 17
+      Start 17: CachedHost_25_6_global
+
+17: Test command: C:\Users\36931\Documents\Codex\2026-09-27\ae\work\aebuild\cached-hosts\25_6\AfterFX.exe "C:/Users/36931/Documents/Codex/2026-09-27/ae/work/aebuild/AeGOFlash.aex" "global"
+17: Working Directory: C:/Users/36931/Documents/Codex/2026-09-27/ae/work/aebuild
+17: Test timeout computed to be: 30
+17: Cold host AE 25.6, CP936, PF API 13.29, first selector GLOBAL_SETUP; registration is never looked up or invoked.
+17: PASS: 3510 checks; all Chinese parameter/group labels, buttons, checkboxes, popups, About and real error bytes; retained text pointers; 12/12 handles and 19/19 suites balanced. This is a versioned AeGO Flash test process, not an actual Adobe host.
+13/21 Test #17: CachedHost_25_6_global ...........   Passed    0.02 sec
+test 18
+      Start 18: CachedHost_25_6_params
+
+18: Test command: C:\Users\36931\Documents\Codex\2026-09-27\ae\work\aebuild\cached-hosts\25_6\AfterFX.exe "C:/Users/36931/Documents/Codex/2026-09-27/ae/work/aebuild/AeGOFlash.aex" "params"
+18: Working Directory: C:/Users/36931/Documents/Codex/2026-09-27/ae/work/aebuild
+18: Test timeout computed to be: 30
+18: Cold host AE 25.6, CP936, PF API 13.29, first selector PARAMS_SETUP; registration is never looked up or invoked.
+18: PASS: 3510 checks; all Chinese parameter/group labels, buttons, checkboxes, popups, About and real error bytes; retained text pointers; 12/12 handles and 19/19 suites balanced. This is a versioned AeGO Flash test process, not an actual Adobe host.
+14/21 Test #18: CachedHost_25_6_params ...........   Passed    0.02 sec
+test 19
+      Start 19: CachedHost_25_6_about
+
+19: Test command: C:\Users\36931\Documents\Codex\2026-09-27\ae\work\aebuild\cached-hosts\25_6\AfterFX.exe "C:/Users/36931/Documents/Codex/2026-09-27/ae/work/aebuild/AeGOFlash.aex" "about"
+19: Working Directory: C:/Users/36931/Documents/Codex/2026-09-27/ae/work/aebuild
+19: Test timeout computed to be: 30
+19: Cold host AE 25.6, CP936, PF API 13.29, first selector ABOUT; registration is never looked up or invoked.
+19: PASS: 3521 checks; all Chinese parameter/group labels, buttons, checkboxes, popups, About and real error bytes; retained text pointers; 12/12 handles and 20/20 suites balanced. This is a versioned AeGO Flash test process, not an actual Adobe host.
+15/21 Test #19: CachedHost_25_6_about ............   Passed    0.02 sec
+test 20
+      Start 20: CachedHost_26_3_global
+
+20: Test command: C:\Users\36931\Documents\Codex\2026-09-27\ae\work\aebuild\cached-hosts\26_3\AfterFX.exe "C:/Users/36931/Documents/Codex/2026-09-27/ae/work/aebuild/AeGOFlash.aex" "global"
+20: Working Directory: C:/Users/36931/Documents/Codex/2026-09-27/ae/work/aebuild
+20: Test timeout computed to be: 30
+20: Cold host AE 26.3, CP65001, PF API 13.29, first selector GLOBAL_SETUP; registration is never looked up or invoked.
+20: PASS: 3510 checks; all Chinese parameter/group labels, buttons, checkboxes, popups, About and real error bytes; retained text pointers; 12/12 handles and 19/19 suites balanced. This is a versioned AeGO Flash test process, not an actual Adobe host.
+16/21 Test #20: CachedHost_26_3_global ...........   Passed    0.06 sec
+test 21
+      Start 21: CachedHost_26_3_params
+
+21: Test command: C:\Users\36931\Documents\Codex\2026-09-27\ae\work\aebuild\cached-hosts\26_3\AfterFX.exe "C:/Users/36931/Documents/Codex/2026-09-27/ae/work/aebuild/AeGOFlash.aex" "params"
+21: Working Directory: C:/Users/36931/Documents/Codex/2026-09-27/ae/work/aebuild
+21: Test timeout computed to be: 30
+21: Cold host AE 26.3, CP65001, PF API 13.29, first selector PARAMS_SETUP; registration is never looked up or invoked.
+21: PASS: 3510 checks; all Chinese parameter/group labels, buttons, checkboxes, popups, About and real error bytes; retained text pointers; 12/12 handles and 19/19 suites balanced. This is a versioned AeGO Flash test process, not an actual Adobe host.
+17/21 Test #21: CachedHost_26_3_params ...........   Passed    0.02 sec
+test 22
+      Start 22: CachedHost_26_3_about
+
+22: Test command: C:\Users\36931\Documents\Codex\2026-09-27\ae\work\aebuild\cached-hosts\26_3\AfterFX.exe "C:/Users/36931/Documents/Codex/2026-09-27/ae/work/aebuild/AeGOFlash.aex" "about"
+22: Working Directory: C:/Users/36931/Documents/Codex/2026-09-27/ae/work/aebuild
+22: Test timeout computed to be: 30
+22: Cold host AE 26.3, CP65001, PF API 13.29, first selector ABOUT; registration is never looked up or invoked.
+22: PASS: 3521 checks; all Chinese parameter/group labels, buttons, checkboxes, popups, About and real error bytes; retained text pointers; 12/12 handles and 20/20 suites balanced. This is a versioned AeGO Flash test process, not an actual Adobe host.
+18/21 Test #22: CachedHost_26_3_about ............   Passed    0.02 sec
+test 23
+      Start 23: AdapterCallbacks
+
+23: Test command: C:\Users\36931\Documents\Codex\2026-09-27\ae\work\aebuild\Live2DAdapterSmoke.exe "C:/Users/36931/Documents/Codex/2026-09-27/ae/work/aebuild/AeGOFlash.aex" "C:/Users/36931/Documents/Codex/2026-09-27/ae/work/deps/CubismSdkForNative-5-r.5/Samples/Resources/Haru/Haru.model3.json"
+23: Working Directory: C:/Users/36931/Documents/Codex/2026-09-27/ae/work/aebuild
+23: Test timeout computed to be: 120
+23: PASS: actual DLL legacy/modern discovery; AE22/24/25 Chinese and AE26/unknown UTF-8 labels, button/checkbox/popup text, About and error bytes; malformed hints and optional language failures preserve established context; retained pointer lifetimes.
+23: Native model rendered through actual AEX: 1904 visible pixels, 14480 transparent pixels; 8/16-bpc channel/range agreement.
+23: PASS: eight-slot selection, independent keyed A/B time, old automatic timing, transition endpoints/intermediate/symmetry and reverse seeking.
+23: PASS: actual AEX independent breathing/blinking keys; host clock independent of A/B time, speed and start; combined operation, reverse seeking, missing values and exact disabled restoration.
+23: PASS: actual AEX expression pixels, independent A/B weights, inactive missing-file skip, weight fades/clamps, deterministic seeking and AE8/AE16 agreement.
+23: PASS: native audio selector; PCM16 stereo checkout; exact 160ms negative/coarse/rational time windows; error/cancellation cleanup; real AEX mouth pixels, silence, sensitivity, 8/16-bpc and motion/expression restoration.
+23: PASS: actual AEX 4/8-thread concurrent calls; independent evaluated parameters/audio/outputs; shared read-only banks and concurrent copy/flatten/dispose; serial-identical 8/16-bpc pixels; cancellation recovery; no render AEGP access.
+23: PASS: deferred native timeline bridge, JSON escaping, idle reentrancy, strict script result/errors, lifecycle and handle cleanup (mock AEGP).
+23: PASS: 50983 checks; actual AEX loading/registration; 11 callbacks for each independent motion/expression bank; v1/v2 motion migration; eight-slot Unicode save/copy/clipboard; malformed input; 8/16-bpc render; no handle leaks.
+19/21 Test #23: AdapterCallbacks .................   Passed    7.67 sec
+test 24
+      Start 24: ImportCommitOwnership
+
+24: Test command: C:\Users\36931\Documents\Codex\2026-09-27\ae\work\aebuild\Live2DImportCommitSmoke.exe
+24: Working Directory: C:/Users/36931/Documents/Codex/2026-09-27/ae/work/aebuild
+24: Test timeout computed to be: 30
+24: PASS: 707 production import/storage/audio/ambient checks; isolated in-memory preferences; new thirty-frame and old fifteen-frame defaults; confirmed motion preference commits; paired1024-entry banks; fixed borrowed handles; immutable snapshots; transactional cancellation/errors; legacy migration; dynamic index routing; simplified blink UI and legacy ambient values.
+20/21 Test #24: ImportCommitOwnership ............   Passed    0.20 sec
+test 25
+      Start 25: TimelineImportGuard
+
+25: Test command: C:\Users\36931\Documents\Codex\2026-09-27\ae\work\aebuild\Live2DTimelineGuardSmoke.exe
+25: Working Directory: C:/Users/36931/Documents/Codex/2026-09-27/ae/work/aebuild
+25: Test timeout computed to be: 30
+25: PASS: 176 timeline import guard checks; AE owner, modal/nested idle, failures, thread and teardown.
+21/21 Test #25: TimelineImportGuard ..............   Passed    0.02 sec
 
 The following tests passed:
-	ImportPreferences
+	HostProcessVersion
 	HostTextCompatibility
 	ChineseUiMessages
-	DialogMotionSearch
+	CachedHost_22_0_global
+	CachedHost_22_0_params
+	CachedHost_22_0_about
+	CachedHost_24_0_global
+	CachedHost_24_0_params
+	CachedHost_24_0_about
+	CachedHost_25_3_global
+	CachedHost_25_3_params
+	CachedHost_25_3_about
+	CachedHost_25_6_global
+	CachedHost_25_6_params
+	CachedHost_25_6_about
+	CachedHost_26_3_global
+	CachedHost_26_3_params
+	CachedHost_26_3_about
 	AdapterCallbacks
 	ImportCommitOwnership
 	TimelineImportGuard
 
-100% tests passed, 0 tests failed out of 7
+100% tests passed, 0 tests failed out of 21
 
-Total Test time (real) =   8.80 sec
+Total Test time (real) =   8.37 sec
