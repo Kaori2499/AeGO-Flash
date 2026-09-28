@@ -1,0 +1,39 @@
+// Windows x64 PiPL metadata, expressed directly as a Windows raw resource.
+// Layout follows Examples/Resources/AE_General.r in the Adobe AE SDK:
+// Windows WORD wrapper, DWORD version/count, then vendor/key/id/length/data.
+// FourCCs are DWORD values; Windows RC writes them little-endian. Property
+// payloads are padded to four bytes. Pascal strings include their length byte;
+// the Windows entry-point string includes its terminating NUL.
+// Keep names, version and flags synchronized with Plugin.cpp/.h and PluginPiPL.r.
+#include "AE_EffectVers.h"
+
+16000 PiPL DISCARDABLE
+BEGIN
+    1, 0L, 12L,
+
+    // 8BIM / kind: AEEffect (eFKT).
+    0x3842494dL, 0x6b696e64L, 0L, 4L, 0x65464b54L,
+    // 8BIM / name: Pascal string, 10 characters + length + padding.
+    0x3842494dL, 0x6e616d65L, 0L, 12L, "\012AeGO Flash\000",
+    // 8BIM / catg: Pascal string.
+    0x3842494dL, 0x63617467L, 0L, 8L, "\004AeGO\000\000\000",
+    // 8BIM / 8664: Windows x64 entry point, C string + padding.
+    0x3842494dL, 0x38363634L, 0L, 12L, "EffectMain\000\000",
+    // 8BIM / ePVR: PiPL version, two WORDs.
+    0x3842494dL, 0x65505652L, 0L, 4L, 2, 0,
+    // 8BIM / eSVR: AE2022 minimum effect API (independent of the build SDK).
+    0x3842494dL, 0x65535652L, 0L, 4L, 13, 27,
+    // Public AeGO Flash 1.0.0; independent AE compatibility version.
+    // 8BIM / eVER: PF_VERSION(1, 13, 0, PF_Stage_RELEASE, 1).
+    0x3842494dL, 0x65564552L, 0L, 4L, 951809L,
+    // 8BIM / eINF: WORD flags followed by WORD padding.
+    0x3842494dL, 0x65494e46L, 0L, 2L, 0, 0,
+    // 8BIM / eGLO: DEEP_COLOR_AWARE | NON_PARAM_VARY | PIX_INDEPENDENT | I_USE_AUDIO | WIDE_TIME_INPUT.
+    0x3842494dL, 0x65474c4fL, 0L, 4L, 0x02100406L,
+    // 8BIM / eGL2: REVEALS_ZERO_ALPHA | SUPPORTS_THREADED_RENDERING | PARAM_GROUP_START_COLLAPSED_FLAG. No float/SmartFX claim.
+    0x3842494dL, 0x65474c32L, 0L, 4L, 0x08000088L,
+    // 8BIM / eMNA: stable match name, Pascal string.
+    0x3842494dL, 0x654d4e41L, 0L, 24L, "\025L2DAE Native Renderer\000\000",
+    // 8BIM / aeFL: reserved information.
+    0x3842494dL, 0x6165464cL, 0L, 4L, 0L
+END

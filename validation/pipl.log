@@ -1,0 +1,2 @@
+size 290 prefix 01 00 00 00 00 00 0c 00 00 00 4d 49 42 38 64 6e 69 6b 00 00 00 00 04 00 00 00 54 4b 46 65 4d 49 42 38 65 6d 61 6e 00 00 00 00 0c 00 00 00 0a 41 65 47 4f 20 46 6c 61 73 68 00 4d 49 42 38 67 74 61 63 00 00 00 00 08 00 00 00 04 41 65 47 4f 00 00 00 4d 49 42 38 34 36 36 38 00 00 00 00 0c 00
+PASS: 12 properties; Windows wrapper; FourCCs; string lengths/padding; AE 13.27; AeGO Flash 1.0.0 / internal AE compatibility (951809); render flags 0x02100406/0x08000088; exact 290-byte resource.

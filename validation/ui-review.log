@@ -1,0 +1,5 @@
+Production Dialog.cpp and renderer exercised in an independent Windows preview process.
+Visible title: AeGO Flash - Import motions and expressions (Chinese caption).
+Chinese controls, three settings cards and upper-body preview displayed correctly with Hotaru: 66 motions and 46 expressions.
+Initial values: 30 frames, transition curve 5. Cancel returned accepted=0 and preferenceSaved=0; process exited normally.
+No AE project or user preference was modified. This is not actual AE installation or saved-project reopening acceptance.

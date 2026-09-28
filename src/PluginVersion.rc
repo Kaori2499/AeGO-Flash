@@ -1,0 +1,30 @@
+// Public release version shown in Windows file properties. AE's separate PiPL
+// compatibility version is independent of the public release number.
+#include <winver.h>
+
+1 VERSIONINFO
+FILEVERSION 1,0,0,1
+PRODUCTVERSION 1,0,0,0
+FILEFLAGSMASK VS_FFI_FILEFLAGSMASK
+FILEFLAGS 0
+FILEOS VOS_NT_WINDOWS32
+FILETYPE VFT_DLL
+FILESUBTYPE 0
+BEGIN
+    BLOCK "StringFileInfo"
+    BEGIN
+        BLOCK "040904b0"
+        BEGIN
+            VALUE "FileDescription", "AeGO Flash effect plug-in\0"
+            VALUE "FileVersion", "1.0.0.1\0"
+            VALUE "InternalName", "AeGOFlash\0"
+            VALUE "OriginalFilename", "AeGOFlash.aex\0"
+            VALUE "ProductName", "AeGO Flash\0"
+            VALUE "ProductVersion", "1.0.0\0"
+        END
+    END
+    BLOCK "VarFileInfo"
+    BEGIN
+        VALUE "Translation", 0x0409, 1200
+    END
+END

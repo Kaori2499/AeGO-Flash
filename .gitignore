@@ -1,0 +1,10 @@
+/build/
+/dist/
+/sdk/
+/.vs/
+*.aex
+*.pdb
+*.obj
+*.lib
+*.dll
+

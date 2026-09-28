@@ -1,0 +1,66 @@
+[ 82%] Built target Framework
+[ 87%] Built target Live2DRenderer
+[ 90%] Built target Live2DAudioEnvelope
+[ 91%] Building CXX object CMakeFiles/Live2DNativeAE.dir/src/Plugin.cpp.obj
+Plugin.cpp
+[ 93%] Building CXX object CMakeFiles/Live2DNativeAE.dir/src/Dialog.cpp.obj
+Dialog.cpp
+C:\Users\36931\Documents\Codex\2026-09-27\ae\outputs\Live2DNativeAE\src\Dialog.cpp(1069): warning C4324: 'l2dae::`anonymous-namespace'::runDialog::Template': structure was padded due to alignment specifier
+[ 95%] Building CXX object CMakeFiles/Live2DNativeAE.dir/src/TimelineHost.cpp.obj
+TimelineHost.cpp
+[ 96%] Building RC object CMakeFiles/Live2DNativeAE.dir/src/PluginVersion.rc.res
+Microsoft (R) Windows (R) Resource Compiler Version 10.0.10011.16384
+
+Copyright (C) Microsoft Corporation.  All rights reserved.
+
+
+[ 98%] Building RC object CMakeFiles/Live2DNativeAE.dir/src/PluginPiPL.rc.res
+Microsoft (R) Windows (R) Resource Compiler Version 10.0.10011.16384
+
+Copyright (C) Microsoft Corporation.  All rights reserved.
+
+
+[100%] Linking CXX shared module AeGOFlash.aex
+[100%] Built target Live2DNativeAE
+[ 50%] Building CXX object CMakeFiles/Live2DUiTextTest.dir/tests/UiText.test.cpp.obj
+UiText.test.cpp
+[100%] Linking CXX executable Live2DUiTextTest.exe
+[100%] Built target Live2DUiTextTest
+[ 50%] Building CXX object CMakeFiles/Live2DDialogSmoke.dir/tests/DialogSmoke.cpp.obj
+DialogSmoke.cpp
+C:\Users\36931\Documents\Codex\2026-09-27\ae\outputs\Live2DNativeAE\tests\../src/Dialog.cpp(1069): warning C4324: 'l2dae::`anonymous-namespace'::runDialog::Template': structure was padded due to alignment specifier
+[100%] Linking CXX executable Live2DDialogSmoke.exe
+[100%] Built target Live2DDialogSmoke
+[  3%] Built target Live2DAudioEnvelope
+[ 81%] Built target Framework
+[ 86%] Built target Live2DRenderer
+[ 95%] Built target Live2DNativeAE
+[ 96%] Building CXX object CMakeFiles/Live2DAdapterSmoke.dir/tests/AdapterSmoke.cpp.obj
+AdapterSmoke.cpp
+[ 98%] Building CXX object CMakeFiles/Live2DAdapterSmoke.dir/src/TimelineHost.cpp.obj
+TimelineHost.cpp
+[100%] Linking CXX executable Live2DAdapterSmoke.exe
+[100%] Built target Live2DAdapterSmoke
+[ 50%] Built target Live2DAudioEnvelope
+[ 75%] Building CXX object CMakeFiles/Live2DImportCommitSmoke.dir/tests/ImportCommitSmoke.cpp.obj
+ImportCommitSmoke.cpp
+C:\Users\36931\Documents\Codex\2026-09-27\ae\outputs\Live2DNativeAE\tests\ImportCommitSmoke.cpp(84): warning C4244: '=': conversion from 'PF_FpLong' to 'float', possible loss of data
+[100%] Linking CXX executable Live2DImportCommitSmoke.exe
+[100%] Built target Live2DImportCommitSmoke
+[ 33%] Building CXX object CMakeFiles/Live2DTimelineGuardSmoke.dir/src/TimelineHost.cpp.obj
+TimelineHost.cpp
+[ 66%] Linking CXX executable Live2DTimelineGuardSmoke.exe
+[100%] Built target Live2DTimelineGuardSmoke
+[ 91%] Built target Framework
+[ 96%] Built target Live2DRenderer
+[ 98%] Building CXX object CMakeFiles/Live2DDialogPreview.dir/src/Dialog.cpp.obj
+Dialog.cpp
+C:\Users\36931\Documents\Codex\2026-09-27\ae\outputs\Live2DNativeAE\src\Dialog.cpp(1069): warning C4324: 'l2dae::`anonymous-namespace'::runDialog::Template': structure was padded due to alignment specifier
+[100%] Linking CXX executable Live2DDialogPreview.exe
+[100%] Built target Live2DDialogPreview
+[ 91%] Built target Framework
+[ 96%] Built target Live2DRenderer
+[ 96%] Building CXX object CMakeFiles/Live2DDialogPreview.dir/tests/DialogPreview.cpp.obj
+DialogPreview.cpp
+[ 98%] Linking CXX executable Live2DDialogPreview.exe
+[100%] Built target Live2DDialogPreview

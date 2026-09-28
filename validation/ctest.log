@@ -1,0 +1,89 @@
+Internal ctest changing into directory: C:/Users/36931/Documents/Codex/2026-09-27/ae/work/aebuild
+UpdateCTestConfiguration  from :C:/Users/36931/Documents/Codex/2026-09-27/ae/work/aebuild/DartConfiguration.tcl
+UpdateCTestConfiguration  from :C:/Users/36931/Documents/Codex/2026-09-27/ae/work/aebuild/DartConfiguration.tcl
+Test project C:/Users/36931/Documents/Codex/2026-09-27/ae/work/aebuild
+Constructing a list of tests
+Done constructing a list of tests
+Updating test list for fixtures
+Added 0 tests to meet fixture requirements
+Checking test dependency graph...
+Checking test dependency graph end
+test 1
+    Start 1: ImportPreferences
+
+1: Test command: C:\Users\36931\Documents\Codex\2026-09-27\ae\work\aebuild\Live2DImportPreferencesTest.exe "C:/Users/36931/Documents/Codex/2026-09-27/ae/work/aebuild/preference-test-workspace"
+1: Working Directory: C:/Users/36931/Documents/Codex/2026-09-27/ae/work/aebuild
+1: Test timeout computed to be: 30
+1: Concurrent diagnostics: saveFailures=0 lastSaveError=0 sessionFailures=0 openFailures=0 lastOpenError=0 readFailures=0 lastReadError=0 malformedRecords=0
+1: Atomic persistence: 96 saves, 12099 complete concurrent snapshots.
+1: PASS: 174 import preference assertions; default 5, cross-session 3/4/5, corruption, Unicode paths, write-failure session fallback and atomic concurrency. Real user preferences untouched.
+1/7 Test #1: ImportPreferences ................   Passed    0.44 sec
+test 2
+    Start 2: HostTextCompatibility
+
+2: Test command: C:\Users\36931\Documents\Codex\2026-09-27\ae\work\aebuild\Live2DHostTextTest.exe
+2: Working Directory: C:/Users/36931/Documents/Codex/2026-09-27/ae/work/aebuild
+2: Test timeout computed to be: 30
+2: PASS: 447 host text compatibility checks; AE22-26 version boundary, CP936/UTF-8, loss detection and bounded fields.
+2/7 Test #2: HostTextCompatibility ............   Passed    0.04 sec
+test 3
+    Start 3: ChineseUiMessages
+
+3: Test command: C:\Users\36931\Documents\Codex\2026-09-27\ae\work\aebuild\Live2DUiTextTest.exe
+3: Working Directory: C:/Users/36931/Documents/Codex/2026-09-27/ae/work/aebuild
+3: Test timeout computed to be: 30
+3: PASS: 166 UI error localization checks; Unicode paths/curve IDs, diagnostics, idempotence and fixed UTF-8 fields.
+3/7 Test #3: ChineseUiMessages ................   Passed    0.04 sec
+test 6
+    Start 6: DialogMotionSearch
+
+6: Test command: C:\Users\36931\Documents\Codex\2026-09-27\ae\work\aebuild\Live2DDialogSmoke.exe
+6: Working Directory: C:/Users/36931/Documents/Codex/2026-09-27/ae/work/aebuild
+6: Test timeout computed to be: 30
+6: PASS 661 checks: combined picker, dynamic assets, preview scheduling and cleanup
+4/7 Test #6: DialogMotionSearch ...............   Passed    0.28 sec
+test 7
+    Start 7: AdapterCallbacks
+
+7: Test command: C:\Users\36931\Documents\Codex\2026-09-27\ae\work\aebuild\Live2DAdapterSmoke.exe "C:/Users/36931/Documents/Codex/2026-09-27/ae/work/aebuild/AeGOFlash.aex" "C:/Users/36931/Documents/Codex/2026-09-27/ae/work/deps/CubismSdkForNative-5-r.5/Samples/Resources/Haru/Haru.model3.json"
+7: Working Directory: C:/Users/36931/Documents/Codex/2026-09-27/ae/work/aebuild
+7: Test timeout computed to be: 120
+7: PASS: actual DLL legacy/modern discovery; AE22 Chinese and AE26/unknown UTF-8 labels, button/checkbox/popup text, About and error bytes; retained pointer lifetimes.
+7: Native model rendered through actual AEX: 1904 visible pixels, 14480 transparent pixels; 8/16-bpc channel/range agreement.
+7: PASS: eight-slot selection, independent keyed A/B time, old automatic timing, transition endpoints/intermediate/symmetry and reverse seeking.
+7: PASS: actual AEX independent breathing/blinking keys; host clock independent of A/B time, speed and start; combined operation, reverse seeking, missing values and exact disabled restoration.
+7: PASS: actual AEX expression pixels, independent A/B weights, inactive missing-file skip, weight fades/clamps, deterministic seeking and AE8/AE16 agreement.
+7: PASS: native audio selector; PCM16 stereo checkout; exact 160ms negative/coarse/rational time windows; error/cancellation cleanup; real AEX mouth pixels, silence, sensitivity, 8/16-bpc and motion/expression restoration.
+7: PASS: actual AEX 4/8-thread concurrent calls; independent evaluated parameters/audio/outputs; shared read-only banks and concurrent copy/flatten/dispose; serial-identical 8/16-bpc pixels; cancellation recovery; no render AEGP access.
+7: PASS: deferred native timeline bridge, JSON escaping, idle reentrancy, strict script result/errors, lifecycle and handle cleanup (mock AEGP).
+7: PASS: 43218 checks; actual AEX loading/registration; 11 callbacks for each independent motion/expression bank; v1/v2 motion migration; eight-slot Unicode save/copy/clipboard; malformed input; 8/16-bpc render; no handle leaks.
+5/7 Test #7: AdapterCallbacks .................   Passed    7.75 sec
+test 8
+    Start 8: ImportCommitOwnership
+
+8: Test command: C:\Users\36931\Documents\Codex\2026-09-27\ae\work\aebuild\Live2DImportCommitSmoke.exe
+8: Working Directory: C:/Users/36931/Documents/Codex/2026-09-27/ae/work/aebuild
+8: Test timeout computed to be: 30
+8: PASS: 707 production import/storage/audio/ambient checks; isolated in-memory preferences; new thirty-frame and old fifteen-frame defaults; confirmed motion preference commits; paired1024-entry banks; fixed borrowed handles; immutable snapshots; transactional cancellation/errors; legacy migration; dynamic index routing; simplified blink UI and legacy ambient values.
+6/7 Test #8: ImportCommitOwnership ............   Passed    0.18 sec
+test 9
+    Start 9: TimelineImportGuard
+
+9: Test command: C:\Users\36931\Documents\Codex\2026-09-27\ae\work\aebuild\Live2DTimelineGuardSmoke.exe
+9: Working Directory: C:/Users/36931/Documents/Codex/2026-09-27/ae/work/aebuild
+9: Test timeout computed to be: 30
+9: PASS: 176 timeline import guard checks; AE owner, modal/nested idle, failures, thread and teardown.
+7/7 Test #9: TimelineImportGuard ..............   Passed    0.06 sec
+
+The following tests passed:
+	ImportPreferences
+	HostTextCompatibility
+	ChineseUiMessages
+	DialogMotionSearch
+	AdapterCallbacks
+	ImportCommitOwnership
+	TimelineImportGuard
+
+100% tests passed, 0 tests failed out of 7
+
+Total Test time (real) =   8.80 sec
