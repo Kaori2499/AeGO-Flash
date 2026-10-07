@@ -7,6 +7,7 @@
 #include <set>
 #include <stdexcept>
 #include <string>
+#include <string_view>
 #include <utility>
 
 namespace l2dae {
@@ -252,6 +253,48 @@ void serialize(const Value& value, std::string& output) {
     output += '\n'; // Cubism's numeric parser requires a comma or newline.
     if (output.size() > 2 * kMaxBytes) fail("normalized file is too large.");
 }
+}
+
+std::string terminateCubismNumbers(std::string_view text) {
+    std::string output;
+    output.reserve(text.size() + text.size() / 32);
+    std::string held;
+    bool inString = false, escape = false, lastDigit = false;
+    const auto flush = [&] {
+        output.append(held);
+        held.clear();
+    };
+    for (const unsigned char value : text) {
+        const char ch = static_cast<char>(value);
+        if (inString) {
+            flush();
+            output += ch;
+            if (escape) escape = false;
+            else if (ch == '\\') escape = true;
+            else if (ch == '"') {
+                inString = false;
+                lastDigit = false;
+            }
+            continue;
+        }
+        if (ch == '"') {
+            flush();
+            output += ch;
+            inString = true;
+            lastDigit = false;
+            continue;
+        }
+        if (ch == ' ' || ch == '\t' || ch == '\r' || ch == '\n') {
+            held += ch;
+            continue;
+        }
+        if ((ch == '}' || ch == ']') && lastDigit) output += '\n';
+        flush();
+        output += ch;
+        lastDigit = ch >= '0' && ch <= '9';
+    }
+    flush();
+    return output;
 }
 
 MotionJsonResult normalizeMotionJson(const std::vector<unsigned char>& input) {

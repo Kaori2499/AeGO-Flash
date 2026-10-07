@@ -32,9 +32,11 @@ LRESULT CALLBACK testProcedure(HWND window, UINT message, WPARAM wParam, LPARAM 
     if (l2dae::dialogProcedure(window, message, wParam, lParam)) return 0;
     return DefWindowProcW(window, message, wParam, lParam);
 }
-void selectRow(HWND window, int id, int row) {
-    SendDlgItemMessageW(window, id, LB_SETCURSEL, row, 0);
-    SendMessageW(window, WM_COMMAND, MAKEWPARAM(id, LBN_SELCHANGE), 0);
+void selectRow(HWND window, int id, int cell) {
+    const auto control = GetDlgItem(window, id);
+    if (cell >= 0) SetPropW(control, L"Live2DGridCell", reinterpret_cast<HANDLE>(static_cast<INT_PTR>(cell + 1)));
+    SendMessageW(control, LB_SETCURSEL, cell < 0 ? static_cast<WPARAM>(-1) : static_cast<WPARAM>(cell / 3), 0);
+    SendMessageW(window, WM_COMMAND, MAKEWPARAM(id, LBN_SELCHANGE), reinterpret_cast<LPARAM>(control));
 }
 }
 
@@ -115,29 +117,48 @@ int main() {
         SetWindowLongPtrW(window, DWLP_USER, reinterpret_cast<LONG_PTR>(&state));
         l2dae::initialize(window, state);
         require(!IsWindowVisible(window), "test remains hidden");
+        require((GetWindowLongPtrW(window, GWL_STYLE) & WS_THICKFRAME) != 0, "dialog border can be dragged");
+        MONITORINFO screen{sizeof(screen)};
+        GetMonitorInfoW(MonitorFromWindow(window, MONITOR_DEFAULTTONEAREST), &screen);
+        RECT windowFrame{}; GetWindowRect(window, &windowFrame);
+        const int workWidth = screen.rcWork.right - screen.rcWork.left;
+        const int workHeight = screen.rcWork.bottom - screen.rcWork.top;
+        require(std::abs((windowFrame.right - windowFrame.left) - workWidth * 3 / 5) <= 2, "dialog opens at 60 percent of the screen width");
+        require(std::abs((windowFrame.bottom - windowFrame.top) - workHeight * 7 / 10) <= 2, "dialog opens at 70 percent of the screen height");
+        require(GetDlgItem(window, l2dae::kBrowseMotion) == nullptr && GetDlgItem(window, l2dae::kBrowseExpression) == nullptr,
+            "external motion and expression file buttons are not shown");
+        require(GetDlgItem(window, l2dae::kModelPath) == nullptr && GetDlgItem(window, l2dae::kImportSummary) == nullptr,
+            "model name and import count captions are not shown");
         require(!IsWindowEnabled(GetDlgItem(window, IDOK)), "cannot import without a selection");
-        require(l2dae::controlText(GetDlgItem(window, l2dae::kTransition)) == L"30", "default transition is thirty frames");
+        require(l2dae::controlText(GetDlgItem(window, l2dae::kTransition)) == L"30 帧", "default transition is thirty frames");
+        RECT dropped{};
+        SendDlgItemMessageW(window, l2dae::kTransition, CB_GETDROPPEDCONTROLRECT, 0, reinterpret_cast<LPARAM>(&dropped));
+        require(dropped.bottom - dropped.top >= 80, "transition list opens tall enough to show its choices");
         require(state.appendClip, "motions append by default");
         require(state.transitionCurve == 5, "first dialog defaults to pronounced rebound");
-        const int bounceButtons[]{l2dae::kBounceNone, l2dae::kBounceGentle, l2dae::kBounceStrong};
+        const auto rebound = GetDlgItem(window, l2dae::kBounceNone);
         const wchar_t* bounceNames[]{L"无", L"轻柔", L"明显"};
+        require(rebound && SendMessageW(rebound, CB_GETCOUNT, 0, 0) == 3, "rebound choices collapse into one list");
+        require(!IsWindowEnabled(rebound), "rebound choices stay disabled without a motion");
+        require((GetWindowLongPtrW(rebound, GWL_STYLE) & WS_TABSTOP) != 0, "rebound choices participate in keyboard tab order");
+        require(SendMessageW(rebound, CB_GETCURSEL, 0, 0) == 2, "only the pronounced rebound choice is selected initially");
         for (int i = 0; i < 3; ++i) {
-            const auto button = GetDlgItem(window, bounceButtons[i]);
-            require(button && l2dae::controlText(button) == bounceNames[i], "all three rebound choices are labeled clearly");
-            require(!IsWindowEnabled(button), "rebound choices stay disabled without a motion");
-            require((GetWindowLongPtrW(button, GWL_STYLE) & WS_TABSTOP) != 0, "rebound choices participate in keyboard tab order");
-            require(l2dae::buttonChosen(bounceButtons[i], state) == (i == 2), "only the pronounced rebound choice is selected initially");
+            wchar_t label[32]{};
+            SendMessageW(rebound, CB_GETLBTEXT, i, reinterpret_cast<LPARAM>(label));
+            require(std::wstring(label) == bounceNames[i], "all three rebound choices are labeled clearly");
         }
         require(GetNextDlgTabItem(window, GetDlgItem(window, l2dae::kTransition), FALSE) == GetDlgItem(window, l2dae::kAppendClip),
             "tab skips unavailable motion-only rebound controls");
-        SendMessageW(window, WM_COMMAND, MAKEWPARAM(l2dae::kBounceGentle, BN_CLICKED), 0);
+        SendMessageW(window, WM_COMMAND, MAKEWPARAM(l2dae::kBounceNone, CBN_SELCHANGE), reinterpret_cast<LPARAM>(rebound));
         require(state.transitionCurve == 5, "disabled rebound choices ignore queued click notifications");
         for (const auto& control : state.controlLayouts)
             require(l2dae::controlText(control.window).find(L"柔和回弹") == std::wstring::npos, "old explanatory rebound sentence is removed");
         require(state.upperBody, "preview opens in upper-body mode");
-        SendMessageW(window, WM_COMMAND, MAKEWPARAM(l2dae::kAtPlayhead, BN_CLICKED), 0);
+        SendDlgItemMessageW(window, l2dae::kAppendClip, CB_SETCURSEL, 1, 0);
+        SendMessageW(window, WM_COMMAND, MAKEWPARAM(l2dae::kAppendClip, CBN_SELCHANGE), 0);
         require(!state.appendClip, "playhead placement is directly selectable");
-        SendMessageW(window, WM_COMMAND, MAKEWPARAM(l2dae::kAppendClip, BN_CLICKED), 0);
+        SendDlgItemMessageW(window, l2dae::kAppendClip, CB_SETCURSEL, 0, 0);
+        SendMessageW(window, WM_COMMAND, MAKEWPARAM(l2dae::kAppendClip, CBN_SELCHANGE), 0);
         require(state.appendClip, "append placement can be restored");
         state.seconds = 1.25;
         SendMessageW(window, WM_COMMAND, MAKEWPARAM(l2dae::kFullBody, BN_CLICKED), 0);
@@ -158,49 +179,48 @@ int main() {
         state.modelValid = true;
         l2dae::rebuildList(window, state, state.motions);
         l2dae::rebuildList(window, state, state.expressions);
-        require(SendDlgItemMessageW(window, l2dae::kMotionList, LB_GETCOUNT, 0, 0) == 401, "all motions loaded with explicit none row");
-        require(SendDlgItemMessageW(window, l2dae::kExpressionList, LB_GETCOUNT, 0, 0) == 321, "all expressions loaded independently");
+        require(SendDlgItemMessageW(window, l2dae::kMotionList, LB_GETCOUNT, 0, 0) == 134, "motions pack three names into each row");
+        require(SendDlgItemMessageW(window, l2dae::kExpressionList, LB_GETCOUNT, 0, 0) == 107, "expressions pack three names into each row");
         require(state.motions.selected.empty() && state.expressions.selected.empty(), "initial lists do not import anything implicitly");
         selectRow(window, l2dae::kMotionList, 124);
         selectRow(window, l2dae::kExpressionList, 24);
         require(state.motions.selected == fixture[123].path && state.expressions.selected == expressionFixture[23].path,
             "motion and expression may be selected simultaneously");
+        const auto motionList = GetDlgItem(window, l2dae::kMotionList);
+        SendMessageW(motionList, LB_SETTOPINDEX, 0, 0);
+        RECT motionListRect{}; GetClientRect(motionList, &motionListRect);
+        const LPARAM thirdColumn = MAKELPARAM(motionListRect.right * 5 / 6, 8);
+        SendMessageW(motionList, WM_LBUTTONDOWN, MK_LBUTTON, thirdColumn);
+        SendMessageW(motionList, WM_LBUTTONUP, 0, thirdColumn);
+        require(state.motions.selected == fixture[1].path, "clicking the third name in a row selects that motion");
+        selectRow(window, l2dae::kMotionList, 124);
         require(IsWindowEnabled(GetDlgItem(window, IDOK)), "combined selection enables import");
-        for (const int id : bounceButtons)
-            require(IsWindowEnabled(GetDlgItem(window, id)), "choosing a motion enables its rebound controls");
-        require(GetNextDlgTabItem(window, GetDlgItem(window, l2dae::kTransition), FALSE) == GetDlgItem(window, l2dae::kBounceNone) &&
-            GetNextDlgTabItem(window, GetDlgItem(window, l2dae::kBounceNone), FALSE) == GetDlgItem(window, l2dae::kBounceGentle) &&
-            GetNextDlgTabItem(window, GetDlgItem(window, l2dae::kBounceGentle), FALSE) == GetDlgItem(window, l2dae::kBounceStrong),
+        require(IsWindowEnabled(rebound), "choosing a motion enables its rebound controls");
+        require(GetNextDlgTabItem(window, GetDlgItem(window, l2dae::kTransition), FALSE) == rebound &&
+            GetNextDlgTabItem(window, rebound, FALSE) == GetDlgItem(window, l2dae::kAppendClip),
             "rebound choices follow the transition duration in keyboard tab order");
         for (int i = 0; i < 3; ++i) {
-            SendDlgItemMessageW(window, bounceButtons[i], BM_CLICK, 0, 0);
-            require(state.transitionCurve == i + 3, "clicking each rebound segment selects its curve");
-            for (int j = 0; j < 3; ++j)
-                require(l2dae::buttonChosen(bounceButtons[j], state) == (i == j), "exactly one rebound segment receives selected colors");
+            SendMessageW(rebound, CB_SETCURSEL, i, 0);
+            SendMessageW(window, WM_COMMAND, MAKEWPARAM(l2dae::kBounceNone, CBN_SELCHANGE), reinterpret_cast<LPARAM>(rebound));
+            require(state.transitionCurve == i + 3, "choosing each rebound item selects its curve");
+            require(SendMessageW(rebound, CB_GETCURSEL, 0, 0) == i, "exactly one rebound item stays selected");
             const auto selected = l2dae::prepareImport(state, true, 15);
             require(selected.transitionCurve == i + 3 && selected.motion.transitionCurve == i + 3 && selected.expression.transitionCurve == 0,
                 "each rebound choice reaches the motion while paired expression fades remain unchanged");
         }
-        SendDlgItemMessageW(window, l2dae::kBounceStrong, WM_KEYDOWN, VK_RIGHT, 0);
-        require(state.transitionCurve == 3, "right arrow wraps from strong to no rebound");
-        SendDlgItemMessageW(window, l2dae::kBounceNone, WM_KEYDOWN, VK_LEFT, 0);
-        require(state.transitionCurve == 5, "left arrow wraps from no rebound to strong");
-        SendDlgItemMessageW(window, l2dae::kBounceStrong, WM_KEYDOWN, VK_LEFT, 0);
-        require(state.transitionCurve == 4, "keyboard arrows select the middle rebound choice");
-        require((SendDlgItemMessageW(window, l2dae::kBounceGentle, WM_GETDLGCODE, 0, 0) & DLGC_WANTARROWS) != 0,
-            "dialog navigation delivers rebound arrow keys to the control");
-        SendDlgItemMessageW(window, l2dae::kBounceNone, BM_CLICK, 0, 0);
+        SendMessageW(rebound, CB_SETCURSEL, 0, 0);
+        SendMessageW(window, WM_COMMAND, MAKEWPARAM(l2dae::kBounceNone, CBN_SELCHANGE), reinterpret_cast<LPARAM>(rebound));
         SetDlgItemTextW(window, l2dae::kSearchMotion, L"action 0123");
-        require(SendDlgItemMessageW(window, l2dae::kMotionList, LB_GETCOUNT, 0, 0) == 2, "case-insensitive declared name search");
-        require(SendDlgItemMessageW(window, l2dae::kMotionList, LB_GETCURSEL, 0, 0) == 1, "filtered motion remains selected");
-        require(SendDlgItemMessageW(window, l2dae::kExpressionList, LB_GETCOUNT, 0, 0) == 321, "motion search leaves expression list unchanged");
+        require(SendDlgItemMessageW(window, l2dae::kMotionList, LB_GETCOUNT, 0, 0) == 1, "case-insensitive declared name search");
+        require(SendDlgItemMessageW(window, l2dae::kMotionList, LB_GETCURSEL, 0, 0) == 0, "filtered motion remains selected");
+        require(SendDlgItemMessageW(window, l2dae::kExpressionList, LB_GETCOUNT, 0, 0) == 107, "motion search leaves expression list unchanged");
         SetDlgItemTextW(window, l2dae::kSearchMotion, L"no-match");
         require(SendDlgItemMessageW(window, l2dae::kMotionList, LB_GETCURSEL, 0, 0) == LB_ERR, "hidden selection is not silently cleared");
         selectRow(window, l2dae::kMotionList, -1);
         require(state.motions.selected == fixture[123].path, "missing list selection leaves selected path intact");
         require(l2dae::controlText(GetDlgItem(window, l2dae::kMotionPath)) == L"动作123", "selected name remains visible without extension");
         SetDlgItemTextW(window, l2dae::kSearchExpression, L"微笑23.exp3");
-        require(SendDlgItemMessageW(window, l2dae::kExpressionList, LB_GETCOUNT, 0, 0) == 2, "Unicode expression path search");
+        require(SendDlgItemMessageW(window, l2dae::kExpressionList, LB_GETCOUNT, 0, 0) == 1, "Unicode expression path search");
         auto imported = l2dae::prepareImport(state, true, state.transitionFrames);
         require(imported.hasMotion && imported.hasExpression, "both selection flags preserved");
         require(imported.motion.label == L"动作123" && imported.expression.label == L"微笑23", "timeline names use imported file names");
@@ -268,17 +288,16 @@ int main() {
         imported = l2dae::prepareImport(state, false, 7);
         require(imported.motion.slot == 129 && imported.expression.slot == 129, "external entries have no old eight-item cap");
         require(imported.motion.label == L"新动作" && imported.expression.label == L"新表情", "external Unicode names strip compound extension");
-        SendDlgItemMessageW(window, l2dae::kBounceStrong, BM_CLICK, 0, 0);
+        SendMessageW(rebound, CB_SETCURSEL, 2, 0);
+        SendMessageW(window, WM_COMMAND, MAKEWPARAM(l2dae::kBounceNone, CBN_SELCHANGE), reinterpret_cast<LPARAM>(rebound));
         require(state.transitionCurve == 5, "motion rebound choice can be changed before clearing the motion");
         selectRow(window, l2dae::kMotionList, 0);
         imported = l2dae::prepareImport(state, true, 15);
         require(!imported.hasMotion && imported.hasExpression && imported.expression.duration == 3.0, "expression-only import remains available");
         require(imported.transitionCurve == 5 && imported.expression.transitionCurve == 0,
             "expression-only output preserves the UI preference without applying it to the expression clip");
-        for (const int id : bounceButtons)
-            require(!IsWindowEnabled(GetDlgItem(window, id)), "expression-only selection disables every rebound choice");
-        SendMessageW(window, WM_COMMAND, MAKEWPARAM(l2dae::kBounceGentle, BN_CLICKED), 0);
-        SendDlgItemMessageW(window, l2dae::kBounceStrong, WM_KEYDOWN, VK_LEFT, 0);
+        require(!IsWindowEnabled(rebound), "expression-only selection disables every rebound choice");
+        SendMessageW(window, WM_COMMAND, MAKEWPARAM(l2dae::kBounceNone, CBN_SELCHANGE), reinterpret_cast<LPARAM>(rebound));
         require(state.transitionCurve == 5, "disabled rebound controls ignore both queued clicks and key presses");
         state.motions.selected = fixture[2].path;
         selectRow(window, l2dae::kExpressionList, 0);
@@ -294,6 +313,8 @@ int main() {
         try { (void)l2dae::prepareImport(state, true, 100001); } catch (...) { rejected = true; }
         require(rejected, "dialog rejects values above the host transition range before commit");
         require(l2dae::animationName(L"C:\\x\\MOTION.MOTION3.JSON") == L"MOTION", "extension normalization ignores case");
+        require(l2dae::animationName(L"D:\\Motions\\mtn_nod01_C.motion3.json") == L"nod01_C", "motion names hide an mtn_ prefix");
+        require(l2dae::animationName(L"D:\\Expressions\\EXP_smile.exp3.json") == L"smile", "expression names hide an exp_ prefix");
         l2dae::RenderResult neutral;
         neutral.width = 384; neutral.height = 448;
         neutral.rgba.resize(static_cast<size_t>(neutral.width) * neutral.height * 4);
@@ -339,8 +360,8 @@ int main() {
         for (const auto& control : state.controlLayouts) {
             const int id = GetDlgCtrlID(control.window);
             const auto text = l2dae::controlText(control.window);
-            if ((id < l2dae::kBounceNone || id > l2dae::kTransitionUnit) && id != l2dae::kAppendClip &&
-                id != l2dae::kAtPlayhead && id != l2dae::kTransition) continue;
+            if (id != l2dae::kTransitionTitle && id != l2dae::kBounceTitle && id != l2dae::kPlacementTitle &&
+                id != l2dae::kTransition && id != l2dae::kBounceNone && id != l2dae::kAppendClip) continue;
             const auto oldFont = SelectObject(textDc, reinterpret_cast<HFONT>(SendMessageW(control.window, WM_GETFONT, 0, 0)));
             SIZE textSize{};
             const bool measured = GetTextExtentPoint32W(textDc, text.c_str(), static_cast<int>(text.size()), &textSize) != 0;
@@ -350,14 +371,14 @@ int main() {
                 "transition section Chinese captions fit their native controls after DPI reflow");
             require(reinterpret_cast<HFONT>(SendMessageW(control.window, WM_GETFONT, 0, 0)) == state.font,
                 "all settings titles input units and buttons use the same font");
-            const bool durationCard = id == l2dae::kTransitionTitle || id == l2dae::kTransition || id == l2dae::kTransitionUnit;
-            const bool placementCard = id == l2dae::kPlacementTitle || id == l2dae::kAppendClip || id == l2dae::kAtPlayhead;
-            const RECT card = durationCard ? RECT{24, 458, 222, 538} : placementCard ? RECT{24, 550, 552, 628} : RECT{234, 458, 552, 538};
+            const bool durationCard = id == l2dae::kTransitionTitle || id == l2dae::kTransition;
+            const bool placementCard = id == l2dae::kPlacementTitle || id == l2dae::kAppendClip;
+            const RECT card = durationCard ? state.transitionCard : placementCard ? state.placementCard : state.reboundCard;
             require(control.x >= card.left + 16 && control.x + control.width <= card.right - 16 &&
                 control.y >= card.top + 10 && control.y + control.height <= card.bottom - 10,
                 "settings controls remain padded inside their own titled card");
-            if ((id >= l2dae::kBounceNone && id <= l2dae::kBounceStrong) || id == l2dae::kAppendClip || id == l2dae::kAtPlayhead)
-                require(control.height == 32, "rebound and placement buttons share a consistent height");
+            if (id == l2dae::kTransition || id == l2dae::kBounceNone || id == l2dae::kAppendClip)
+                require(control.height == 28, "settings lists share a consistent closed height");
         }
         ReleaseDC(window, textDc);
         require(l2dae::controlText(GetDlgItem(window, l2dae::kTransitionTitle)) == L"过渡时长" &&
@@ -366,12 +387,36 @@ int main() {
             "three separate settings sections have clear permanent titles");
         for (const auto& control : state.controlLayouts) {
             const int id = GetDlgCtrlID(control.window);
+            const auto& column = id == l2dae::kExpressionList ? state.expressionCard : state.motionCard;
             if (id == l2dae::kMotionList || id == l2dae::kExpressionList)
-                require(control.height >= 4 * 32 && control.y + control.height <= 362,
-                    "shortened motion and expression lists still show at least four rows above settings");
+                require(control.y >= column.top && control.y + control.height <= column.bottom &&
+                    control.height + 80 >= (column.bottom - column.top) / 2,
+                    "motion and expression lists fill most of their shared row");
+            if (id == l2dae::kMotionSearchHint || id == l2dae::kExpressionSearchHint) {
+                const int fieldId = id == l2dae::kMotionSearchHint ? l2dae::kSearchMotion : l2dae::kSearchExpression;
+                const l2dae::DialogState::ControlLayout* field = nullptr;
+                for (const auto& candidate : state.controlLayouts)
+                    if (GetDlgCtrlID(candidate.window) == fieldId) field = &candidate;
+                require(field && control.y == field->y && control.height == field->height && control.height == 28 &&
+                    control.x + control.width + 6 <= field->x,
+                    "search label matches the field height and stays clear of the input");
+            }
             if (id == l2dae::kPreview)
-                require(control.width == 406 && control.height == 400, "settings redesign preserves the large character preview");
+                require(control.y >= state.previewCard.top && control.y + control.height <= state.previewCard.bottom &&
+                    control.height >= 48, "preview stays inside the same row as the lists");
+            if (id == IDOK)
+                require(control.x <= 24 && control.y > state.transitionCard.bottom && control.width > 400,
+                    "add action occupies its own full row beneath the settings");
         }
+        require(state.motionCard.top == state.expressionCard.top && state.motionCard.top == state.previewCard.top &&
+            state.motionCard.bottom == state.expressionCard.bottom && state.motionCard.bottom == state.previewCard.bottom,
+            "motion, expression and preview share one row and one height");
+        require(state.motionCard.right - state.motionCard.left == state.expressionCard.right - state.expressionCard.left &&
+            state.motionCard.right - state.motionCard.left > state.previewCard.right - state.previewCard.left,
+            "motion and expression columns are wider than the preview");
+        require(state.transitionCard.top == state.reboundCard.top && state.reboundCard.top == state.placementCard.top,
+            "transition, rebound and placement stay on one row");
+        require(GetDlgItem(window, IDCANCEL) == nullptr, "the cancel button is not part of the import row");
         state.result.transitionCurve = 4;
         state.result.transitionFrames = 777;
         const auto beforeCancel = state.pending;

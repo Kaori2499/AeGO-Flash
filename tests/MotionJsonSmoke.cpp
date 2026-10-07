@@ -152,6 +152,16 @@ int main() {
         expect(compact(normalize(literal)) == literal, "Infinity inside strings was modified");
         const auto unicode = normalize(replace(standard, "ParamPedalOn", "\\u773c\\u775b"));
         expect(compact(unicode).find("眼睛") != std::string::npos, "Unicode ID was not decoded safely");
+        const auto objectEnd = l2dae::terminateCubismNumbers(R"({"Y":-1.0})");
+        expect(objectEnd.find("-1.0\n}") != std::string::npos, "compact number before object end");
+        const auto arrayEnd = l2dae::terminateCubismNumbers("[1,2]");
+        expect(arrayEnd.find("2\n]") != std::string::npos, "compact number before array end");
+        const auto spaced = l2dae::terminateCubismNumbers(R"({"Y":-1.0 })");
+        expect(spaced.find("-1.0\n }") != std::string::npos, "newline precedes whitespace before a closer");
+        const std::string quoted = l2dae::terminateCubismNumbers(R"({"Name":"1}"})");
+        expect(quoted == "{\"Name\":\"1}\"}", "digits inside strings stay intact");
+        const std::string pretty = l2dae::terminateCubismNumbers("{\"Y\": -1.0,\n}");
+        expect(pretty == "{\"Y\": -1.0,\n}", "a comma already ends the number");
         std::cout << "Motion JSON compatibility: " << checks << " checks passed.\n";
         return 0;
     } catch (const std::exception& error) {

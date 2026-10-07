@@ -57,11 +57,26 @@ constexpr int kTransitionTitle = 134;
 constexpr int kBounceTitle = 135;
 constexpr int kPlacementTitle = 136;
 constexpr int kTransitionUnit = 137;
+constexpr int kMotionTitle = 138;
+constexpr int kExpressionTitle = 139;
+constexpr int kPreviewTitle = 140;
+constexpr int kMotionSelectedCaption = 145;
+constexpr int kExpressionSelectedCaption = 146;
 constexpr UINT_PTR kPreviewTimer = 1;
 constexpr UINT kSeekPreview = WM_APP + 29;
 constexpr int kMaximumTransitionFrames = 100000;
 constexpr int kLayoutWidth = 1040;
 constexpr int kLayoutHeight = 700;
+constexpr int kColumnTop = 80;
+constexpr int kColumnBottom = 516;
+constexpr int kSettingsTop = 528;
+constexpr int kSettingsBottom = 600;
+constexpr int kMotionLeft = 24;
+constexpr int kMotionRight = 304;
+constexpr int kExpressionLeft = 316;
+constexpr int kExpressionRight = 596;
+constexpr int kPreviewLeft = 608;
+constexpr int kPreviewRight = 1016;
 constexpr COLORREF kBackgroundColor = RGB(22, 24, 30);
 constexpr COLORREF kCardColor = RGB(31, 34, 42);
 constexpr COLORREF kInputColor = RGB(39, 43, 53);
@@ -117,8 +132,15 @@ bool hasSuffix(const std::wstring& value, const wchar_t* suffix) {
 
 std::wstring animationName(const std::wstring& path) {
     auto name = std::filesystem::path(path).filename().wstring();
+    bool animation = false;
     for (const auto* suffix : {L".motion3.json", L".exp3.json"}) {
-        if (hasSuffix(name, suffix)) { name.resize(name.size() - wcslen(suffix)); break; }
+        if (hasSuffix(name, suffix)) { name.resize(name.size() - wcslen(suffix)); animation = true; break; }
+    }
+    if (animation) for (const auto* prefix : {L"mtn_", L"exp_"}) {
+        const size_t count = wcslen(prefix);
+        if (name.size() >= count && _wcsnicmp(name.c_str(), prefix, static_cast<int>(count)) == 0) {
+            name.erase(0, count); break;
+        }
     }
     return name;
 }
@@ -178,6 +200,8 @@ std::wstring controlText(HWND control) {
     return result;
 }
 
+constexpr int kGridColumns = 3;
+
 struct PickerList {
     std::vector<MotionEntry> entries;
     std::vector<size_t> visible;
@@ -187,6 +211,8 @@ struct PickerList {
     int searchId = 0;
     int pathId = 0;
     bool expression = false;
+    int gridColumn = 0;
+    int pressedCell = -1;
 };
 
 // There is exactly one queued request and one completed image. Rapid scrubbing
@@ -247,6 +273,7 @@ private:
             PreviewBounds framing;
             bool calibrated = false;
             int calibrationAttempts = 0;
+            int framedWidth = 0, framedHeight = 0;
             for (;;) {
                 RenderRequest request;
                 std::uint64_t generation = 0;
@@ -267,6 +294,12 @@ private:
                         durationReady = true;
                     }
                     result.duration = cachedDuration;
+                    if (request.width != framedWidth || request.height != framedHeight) {
+                        calibrated = false;
+                        calibrationAttempts = 0;
+                        framedWidth = request.width;
+                        framedHeight = request.height;
+                    }
                     if (!calibrated && calibrationAttempts < 3 && request.width > 0 && request.height > 0) {
                         ++calibrationAttempts;
                         auto neutral = request;
@@ -341,7 +374,14 @@ struct DialogState {
     HBRUSH inputBrush = nullptr;
     std::vector<ControlLayout> controlLayouts;
     int dpi = 96;
+    RECT motionCard{};
+    RECT expressionCard{};
+    RECT previewCard{};
+    RECT transitionCard{};
+    RECT reboundCard{};
+    RECT placementCard{};
     int transitionFrames = 30;
+    int extraTransitionFrames = -1;
     int transitionCurve = 5;
     bool controlsReady = false;
     bool rebuilding = false;
@@ -384,15 +424,34 @@ void updateSummary(HWND window, const DialogState& state) {
     SetDlgItemTextW(window, kExpressionPath, state.expressions.selected.empty() ? uiText(L"No expression", L"未选择表情") : animationName(state.expressions.selected).c_str());
     const bool any = !state.motions.selected.empty() || !state.expressions.selected.empty();
     EnableWindow(GetDlgItem(window, IDOK), state.modelValid && any);
-    for (const int id : {kBounceNone, kBounceGentle, kBounceStrong}) {
-        const auto control = GetDlgItem(window, id);
-        EnableWindow(control, state.modelValid && !state.motions.selected.empty());
-        InvalidateRect(control, nullptr, FALSE);
-    }
-    const auto summary = !any ? uiText(L"Choose a motion or expression to preview and import.", L"选择动作或表情，即可预览并导入。") :
-        !state.motions.selected.empty() && !state.expressions.selected.empty() ? uiText(L"Adds 1 motion clip and 1 expression clip", L"将添加 1 个动作片段和 1 个表情片段") :
-        !state.motions.selected.empty() ? uiText(L"Adds 1 motion clip", L"将添加 1 个动作片段") : uiText(L"Adds 1 expression clip", L"将添加 1 个表情片段");
-    SetDlgItemTextW(window, kImportSummary, summary);
+    const auto rebound = GetDlgItem(window, kBounceNone);
+    EnableWindow(rebound, state.modelValid && !state.motions.selected.empty());
+    InvalidateRect(rebound, nullptr, FALSE);
+}
+
+int pickerCells(const PickerList& list) {
+    return 1 + static_cast<int>(list.visible.size());
+}
+
+int cellAtPoint(HWND list, int x, int y) {
+    RECT bounds{}; GetClientRect(list, &bounds);
+    const int width = std::max(1, static_cast<int>(bounds.right));
+    const int itemHeight = std::max(1, static_cast<int>(SendMessageW(list, LB_GETITEMHEIGHT, 0, 0)));
+    const int top = std::max(0, static_cast<int>(SendMessageW(list, LB_GETTOPINDEX, 0, 0)));
+    const int row = top + std::max(0, y) / itemHeight;
+    int column = 0;
+    for (int candidate = 0; candidate < kGridColumns; ++candidate)
+        if (x >= candidate * width / kGridColumns) column = candidate;
+    return row * kGridColumns + column;
+}
+
+bool applyListCell(PickerList& list, int cell) {
+    const int cells = pickerCells(list);
+    if (cell < 0 || cell >= cells) return false;
+    if (cell == 0) list.selected.clear();
+    else list.selected = list.entries[list.visible[static_cast<size_t>(cell - 1)]].path;
+    list.gridColumn = cell % kGridColumns;
+    return true;
 }
 
 void rebuildList(HWND window, DialogState& state, PickerList& list) {
@@ -405,20 +464,20 @@ void rebuildList(HWND window, DialogState& state, PickerList& list) {
     } guard(control, state.rebuilding);
     SendMessageW(control, LB_RESETCONTENT, 0, 0);
     list.visible.clear();
-    const wchar_t* none = list.expression ? uiText(L"(Skip expression)", L"（不导入表情）") : uiText(L"(Skip motion)", L"（不导入动作）");
-    if (SendMessageW(control, LB_ADDSTRING, 0, reinterpret_cast<LPARAM>(none)) != 0)
-        throw std::runtime_error("Cannot populate the animation list.");
-    int selected = list.selected.empty() ? 0 : -1;
+    list.pressedCell = -1;
+    int selectedCell = list.selected.empty() ? 0 : -1;
     for (size_t i = 0; i < list.entries.size(); ++i) {
         const auto& entry = list.entries[i];
         if (!matchesQuery(entry.label, list.query) && !matchesQuery(entry.path, list.query)) continue;
-        const auto name = animationName(entry.path);
-        const auto row = SendMessageW(control, LB_ADDSTRING, 0, reinterpret_cast<LPARAM>(name.c_str()));
-        if (row == LB_ERR || row == LB_ERRSPACE) throw std::runtime_error("Cannot populate the animation list.");
         list.visible.push_back(i);
-        if (entry.path == list.selected) selected = static_cast<int>(row);
+        if (entry.path == list.selected) selectedCell = static_cast<int>(list.visible.size());
     }
-    SendMessageW(control, LB_SETCURSEL, selected, 0);
+    const int rows = (pickerCells(list) + kGridColumns - 1) / kGridColumns;
+    for (int row = 0; row < rows; ++row)
+        if (SendMessageW(control, LB_ADDSTRING, 0, reinterpret_cast<LPARAM>(L"")) == LB_ERR)
+            throw std::runtime_error("Cannot populate the animation list.");
+    if (selectedCell >= 0) list.gridColumn = selectedCell % kGridColumns;
+    SendMessageW(control, LB_SETCURSEL, selectedCell < 0 ? -1 : selectedCell / kGridColumns, 0);
     const auto count = std::to_wstring(list.visible.size()) + (list.query.empty() ? std::wstring(uiText(L" items", L" 项")) : L" / " + std::to_wstring(list.entries.size()));
     SetDlgItemTextW(window, list.expression ? kExpressionCount : kMotionCount, count.c_str());
     updateSummary(window, state);
@@ -485,7 +544,7 @@ void selectionChanged(HWND window, DialogState& state) {
     SetDlgItemTextW(window, kStatus, uiText(L"Updating preview...", L"正在更新预览…"));
 }
 
-void submitPreview(DialogState& state) {
+void submitPreview(HWND window, DialogState& state) {
     RenderRequest request = state.previewSettings;
     request.modelPath = state.pending.modelPath;
     request.motionPath = state.motions.selected;
@@ -501,8 +560,10 @@ void submitPreview(DialogState& state) {
     request.scale = 1;
     request.offsetX = 0;
     request.offsetY = 0;
-    request.width = 384;
-    request.height = 448;
+    RECT preview{};
+    if (const auto control = GetDlgItem(window, kPreview)) GetClientRect(control, &preview);
+    request.width = std::max(1, static_cast<int>(preview.right));
+    request.height = std::max(1, static_cast<int>(preview.bottom));
     request.pixelAspect = 1;
     state.worker.submit(std::move(request), state.generation, state.upperBody);
     state.previewDirty = false;
@@ -546,7 +607,42 @@ void tick(HWND window, DialogState& state) {
     wchar_t time[64]{};
     swprintf_s(time, simplifiedChineseUi() ? L"%.2f / %.2f 秒" : L"%.2f / %.2f s", state.seconds, state.duration);
     SetDlgItemTextW(window, kTime, time);
-    if (state.previewEnabled && state.previewDirty) submitPreview(state);
+    if (state.previewEnabled && state.previewDirty) submitPreview(window, state);
+}
+
+struct SettingChoice { const wchar_t* english; const wchar_t* chinese; int value; };
+const SettingChoice kTransitionChoices[]{
+    {L"0 frames", L"0 帧", 0}, {L"15 frames", L"15 帧", 15}, {L"30 frames", L"30 帧", 30},
+    {L"45 frames", L"45 帧", 45}, {L"60 frames", L"60 帧", 60}};
+const SettingChoice kReboundChoices[]{
+    {L"None", L"无", 3}, {L"Soft", L"轻柔", 4}, {L"Strong", L"明显", 5}};
+const SettingChoice kPlacementChoices[]{
+    {L"After Previous Clip", L"接在上一动作后", 1}, {L"At Current Time", L"从当前时间开始", 0}};
+
+void fillSettingCombo(HWND combo, DialogState& state, const SettingChoice* choices, int count, int selected) {
+    SendMessageW(combo, CB_RESETCONTENT, 0, 0);
+    int selectedIndex = 0;
+    bool found = false;
+    for (int i = 0; i < count; ++i) {
+        const auto label = uiText(choices[i].english, choices[i].chinese);
+        if (SendMessageW(combo, CB_ADDSTRING, 0, reinterpret_cast<LPARAM>(label)) < 0)
+            throw std::runtime_error("Cannot populate a settings list.");
+        if (choices[i].value == selected) { selectedIndex = i; found = true; }
+    }
+    if (!found) {
+        wchar_t extra[64]{};
+        swprintf_s(extra, simplifiedChineseUi() ? L"%d 帧" : L"%d frames", selected);
+        selectedIndex = static_cast<int>(SendMessageW(combo, CB_ADDSTRING, 0, reinterpret_cast<LPARAM>(extra)));
+        if (selectedIndex < 0) throw std::runtime_error("Cannot populate a settings list.");
+        state.extraTransitionFrames = selected;
+    }
+    SendMessageW(combo, CB_SETCURSEL, selectedIndex, 0);
+}
+
+int selectedSetting(HWND combo, const SettingChoice* choices, int count, int extra) {
+    const auto index = static_cast<int>(SendMessageW(combo, CB_GETCURSEL, 0, 0));
+    if (index >= 0 && index < count) return choices[index].value;
+    return extra;
 }
 
 HWND addControl(HWND parent, DialogState& state, const wchar_t* kind, const wchar_t* text,
@@ -561,25 +657,30 @@ HWND addControl(HWND parent, DialogState& state, const wchar_t* kind, const wcha
     return control;
 }
 
+HWND addCombo(HWND parent, DialogState& state, int x, int y, int width, int height, int id) {
+    // The creation height is the closed field plus the dropped list. Windows keeps
+    // that list height after the visible control is restored to one row.
+    auto control = addControl(parent, state, L"COMBOBOX", L"",
+        CBS_DROPDOWNLIST | CBS_HASSTRINGS | CBS_OWNERDRAWFIXED | WS_VSCROLL | WS_TABSTOP,
+        0, x, y, width, height + 180, id);
+    state.controlLayouts.back().height = height;
+    const auto px = [&state](int v) { return MulDiv(v, state.dpi, 96); };
+    SetWindowPos(control, nullptr, px(x), px(y), px(width), px(height), SWP_NOZORDER | SWP_NOACTIVATE);
+    if (const auto theme = LoadLibraryExW(L"uxtheme.dll", nullptr, LOAD_LIBRARY_SEARCH_SYSTEM32)) {
+        using SetTheme = HRESULT(WINAPI*)(HWND, LPCWSTR, LPCWSTR);
+        if (const auto setTheme = reinterpret_cast<SetTheme>(GetProcAddress(theme, "SetWindowTheme")))
+            setTheme(control, L"", L"");
+        FreeLibrary(theme);
+    }
+    return control;
+}
+
 LRESULT CALLBACK buttonProcedure(HWND window, UINT message, WPARAM wParam, LPARAM lParam) {
     const auto original = reinterpret_cast<WNDPROC>(GetPropW(window, L"Live2DOriginalButtonProc"));
     const auto parent = GetParent(window);
     auto* state = parent ? reinterpret_cast<DialogState*>(GetWindowLongPtrW(parent, DWLP_USER)) : nullptr;
     const int id = GetDlgCtrlID(window);
-    if (id >= kBounceNone && id <= kBounceStrong && state) {
-        if (message == WM_GETDLGCODE)
-            return (original ? CallWindowProcW(original, window, message, wParam, lParam) : DLGC_BUTTON) | DLGC_WANTARROWS;
-        if (message == WM_KEYDOWN && IsWindowEnabled(window) &&
-            (wParam == VK_LEFT || wParam == VK_RIGHT || wParam == VK_UP || wParam == VK_DOWN)) {
-            const int next = kBounceNone + (id - kBounceNone +
-                (wParam == VK_LEFT || wParam == VK_UP ? 2 : 1)) % 3;
-            const auto control = GetDlgItem(parent, next);
-            SetFocus(control);
-            SendMessageW(parent, WM_COMMAND, MAKEWPARAM(next, BN_CLICKED), reinterpret_cast<LPARAM>(control));
-            return 0;
-        }
-    }
-    if (GetDlgCtrlID(window) == kScrub && state) {
+    if (id == kScrub && state) {
         if (message == WM_GETDLGCODE) return DLGC_WANTARROWS;
         if (message == WM_LBUTTONDOWN || (message == WM_MOUSEMOVE && GetCapture() == window)) {
             if (message == WM_LBUTTONDOWN) { SetFocus(window); SetCapture(window); }
@@ -610,6 +711,40 @@ LRESULT CALLBACK buttonProcedure(HWND window, UINT message, WPARAM wParam, LPARA
     const auto result = original ? CallWindowProcW(original, window, message, wParam, lParam)
                                 : DefWindowProcW(window, message, wParam, lParam);
     if (message == WM_NCDESTROY) RemovePropW(window, L"Live2DOriginalButtonProc");
+    return result;
+}
+
+LRESULT CALLBACK listProcedure(HWND window, UINT message, WPARAM wParam, LPARAM lParam) {
+    const auto original = reinterpret_cast<WNDPROC>(GetPropW(window, L"Live2DOriginalListProc"));
+    const auto parent = GetParent(window);
+    auto* state = parent ? reinterpret_cast<DialogState*>(GetWindowLongPtrW(parent, DWLP_USER)) : nullptr;
+    const int id = GetDlgCtrlID(window);
+    auto* list = state && id == kExpressionList ? &state->expressions : state && id == kMotionList ? &state->motions : nullptr;
+    const auto notify = [&](int note) {
+        if (list && list->pressedCell >= 0)
+            SendMessageW(parent, WM_COMMAND, MAKEWPARAM(id, note), reinterpret_cast<LPARAM>(window));
+    };
+    if (list && (message == WM_LBUTTONDOWN || message == WM_LBUTTONDBLCLK)) {
+        list->pressedCell = cellAtPoint(window, static_cast<short>(LOWORD(lParam)), static_cast<short>(HIWORD(lParam)));
+        const auto result = original ? CallWindowProcW(original, window, message, wParam, lParam)
+                                     : DefWindowProcW(window, message, wParam, lParam);
+        notify(message == WM_LBUTTONDBLCLK ? LBN_DBLCLK : LBN_SELCHANGE);
+        return result;
+    }
+    if (list && message == WM_KEYDOWN && (wParam == VK_LEFT || wParam == VK_RIGHT)) {
+        int cell = list->selected.empty() ? 0 : -1;
+        if (!list->selected.empty()) for (size_t i = 0; i < list->visible.size(); ++i)
+            if (list->entries[list->visible[i]].path == list->selected) { cell = static_cast<int>(i) + 1; break; }
+        cell += wParam == VK_RIGHT ? 1 : -1;
+        if (cell < 0 || cell >= pickerCells(*list)) return 0;
+        list->pressedCell = cell;
+        SendMessageW(window, LB_SETCURSEL, cell / kGridColumns, 0);
+        notify(LBN_SELCHANGE);
+        return 0;
+    }
+    const auto result = original ? CallWindowProcW(original, window, message, wParam, lParam)
+                                : DefWindowProcW(window, message, wParam, lParam);
+    if (message == WM_NCDESTROY) RemovePropW(window, L"Live2DOriginalListProc");
     return result;
 }
 
@@ -655,20 +790,107 @@ void refreshFonts(DialogState& state) {
     for (const auto handle : old) if (handle) DeleteObject(handle);
 }
 
+DialogState::ControlLayout* findLayout(DialogState& state, int id) {
+    for (auto& control : state.controlLayouts)
+        if (GetDlgCtrlID(control.window) == id) return &control;
+    return nullptr;
+}
+
+void placeControl(DialogState& state, int id, int x, int y, int width, int height) {
+    auto* layout = findLayout(state, id);
+    if (!layout) return;
+    layout->x = x; layout->y = y; layout->width = width; layout->height = height;
+    const int dpi = std::max(1, state.dpi);
+    SetWindowPos(layout->window, nullptr, MulDiv(x, dpi, 96), MulDiv(y, dpi, 96),
+        MulDiv(width, dpi, 96), MulDiv(height, dpi, 96), SWP_NOZORDER | SWP_NOACTIVATE);
+}
+
+void layoutDialog(HWND window, DialogState& state) {
+    RECT client{}; GetClientRect(window, &client);
+    const int dpi = std::max(1, state.dpi);
+    const int width = MulDiv(client.right, 96, dpi);
+    const int height = MulDiv(client.bottom, 96, dpi);
+    if (width < 240 || height < 240) return;
+    const int margin = 20, gap = 12, settingsHeight = 76, buttonHeight = 44;
+    const int columnTop = 78;
+    const int columnBottom = std::max(columnTop + 180, height - (12 + settingsHeight + 12 + 10 + buttonHeight + 16));
+    const int inner = width - margin * 2;
+    const int columns = std::max(0, inner - gap * 2);
+    const int motionWidth = columns * 5 / 13;
+    const int expressionWidth = columns * 5 / 13;
+    const int previewWidth = columns - motionWidth - expressionWidth;
+    const int motionLeft = margin;
+    const int motionRight = motionLeft + motionWidth;
+    const int expressionLeft = motionRight + gap;
+    const int expressionRight = expressionLeft + expressionWidth;
+    const int previewLeft = expressionRight + gap;
+    const int previewRight = previewLeft + previewWidth;
+    state.motionCard = {motionLeft, columnTop, motionRight, columnBottom};
+    state.expressionCard = {expressionLeft, columnTop, expressionRight, columnBottom};
+    state.previewCard = {previewLeft, columnTop, previewRight, columnBottom};
+    const int settingsTop = columnBottom + 12;
+    const int settingsBottom = settingsTop + settingsHeight;
+    const int settingGap = gap;
+    const int settingWidth = std::max(0, (inner - settingGap * 2) / 3);
+    state.transitionCard = {margin, settingsTop, margin + settingWidth, settingsBottom};
+    state.reboundCard = {margin + settingWidth + settingGap, settingsTop,
+        margin + settingWidth * 2 + settingGap, settingsBottom};
+    state.placementCard = {margin + (settingWidth + settingGap) * 2, settingsTop, width - margin, settingsBottom};
+
+    const auto columnBody = [&](int left, int right, bool expression) {
+        const int title = expression ? kExpressionTitle : kMotionTitle;
+        const int count = expression ? kExpressionCount : kMotionCount;
+        const int hint = expression ? kExpressionSearchHint : kMotionSearchHint;
+        const int search = expression ? kSearchExpression : kSearchMotion;
+        const int list = expression ? kExpressionList : kMotionList;
+        const int caption = expression ? kExpressionSelectedCaption : kMotionSelectedCaption;
+        const int path = expression ? kExpressionPath : kMotionPath;
+        placeControl(state, title, left + 16, columnTop + 12, 140, 26);
+        placeControl(state, count, right - 140, columnTop + 16, 124, 22);
+        const int searchY = columnTop + 44;
+        const int hintWidth = 58;
+        const int fieldX = left + 16 + hintWidth + 14;
+        placeControl(state, hint, left + 16, searchY, hintWidth, 28);
+        placeControl(state, search, fieldX, searchY, std::max(40, right - 16 - fieldX), 28);
+        const int listTop = columnTop + 80;
+        const int listBottom = columnBottom - 48;
+        placeControl(state, list, left + 12, listTop, right - left - 24, std::max(32, listBottom - listTop));
+        placeControl(state, caption, left + 16, columnBottom - 36, 72, 22);
+        placeControl(state, path, left + 92, columnBottom - 38, right - left - 108, 24);
+    };
+    columnBody(motionLeft, motionRight, false);
+    columnBody(expressionLeft, expressionRight, true);
+    placeControl(state, kPreviewTitle, previewLeft + 16, columnTop + 12, std::max(40, previewWidth - 180), 26);
+    placeControl(state, kUpperBody, previewRight - 160, columnTop + 8, 70, 32);
+    placeControl(state, kFullBody, previewRight - 84, columnTop + 8, 68, 32);
+    const int previewTop = columnTop + 48;
+    const int transport = columnBottom - 78;
+    placeControl(state, kPreview, previewLeft + 16, previewTop, previewWidth - 32, std::max(48, transport - previewTop));
+    placeControl(state, kPlay, previewLeft + 16, transport + 4, 76, 30);
+    placeControl(state, kScrub, previewLeft + 100, transport + 6, std::max(40, previewWidth - 220), 26);
+    placeControl(state, kTime, previewRight - 112, transport + 6, 96, 24);
+    placeControl(state, kStatus, previewLeft + 16, transport + 40, previewWidth - 32, 28);
+    const auto setting = [&](const RECT& card, int title, int combo) {
+        placeControl(state, title, card.left + 16, card.top + 12, card.right - card.left - 32, 18);
+        placeControl(state, combo, card.left + 16, card.top + 34, card.right - card.left - 32, 28);
+    };
+    setting(state.transitionCard, kTransitionTitle, kTransition);
+    setting(state.reboundCard, kBounceTitle, kBounceNone);
+    setting(state.placementCard, kPlacementTitle, kAppendClip);
+    placeControl(state, kHeading, margin, 16, width - margin * 2, 34);
+    placeControl(state, kSubtitle, margin, 50, width - margin * 2, 22);
+    placeControl(state, IDOK, margin, height - 16 - buttonHeight, width - margin * 2, buttonHeight);
+    for (const int list : {kMotionList, kExpressionList})
+        SendDlgItemMessageW(window, list, LB_SETITEMHEIGHT, 0, MulDiv(32, dpi, 96));
+}
+
 void reflowDpi(HWND window, DialogState& state, int requestedDpi, const RECT& suggested) {
-    MONITORINFO monitor{sizeof(MONITORINFO)};
-    GetMonitorInfoW(MonitorFromRect(&suggested, MONITOR_DEFAULTTONEAREST), &monitor);
-    state.dpi = fittedDpi(requestedDpi, monitor.rcWork.right - monitor.rcWork.left, monitor.rcWork.bottom - monitor.rcWork.top);
+    state.dpi = std::max(60, requestedDpi);
     refreshFonts(state);
-    const auto px = [&state](int v) { return MulDiv(v, state.dpi, 96); };
-    RECT bounds{0, 0, px(kLayoutWidth), px(kLayoutHeight)}; windowBounds(window, bounds, requestedDpi);
-    const int width = bounds.right - bounds.left, height = bounds.bottom - bounds.top;
-    const int x = std::max(monitor.rcWork.left, std::min(suggested.left, monitor.rcWork.right - width));
-    const int y = std::max(monitor.rcWork.top, std::min(suggested.top, monitor.rcWork.bottom - height));
-    SetWindowPos(window, nullptr, x, y, width, height, SWP_NOZORDER | SWP_NOACTIVATE);
-    for (const auto& control : state.controlLayouts)
-        SetWindowPos(control.window, nullptr, px(control.x), px(control.y), px(control.width), px(control.height), SWP_NOZORDER | SWP_NOACTIVATE);
-    for (const int list : {kMotionList, kExpressionList}) SendDlgItemMessageW(window, list, LB_SETITEMHEIGHT, 0, px(32));
+    if (suggested.right > suggested.left && suggested.bottom > suggested.top)
+        SetWindowPos(window, nullptr, suggested.left, suggested.top,
+            suggested.right - suggested.left, suggested.bottom - suggested.top, SWP_NOZORDER | SWP_NOACTIVATE);
+    layoutDialog(window, state);
     RedrawWindow(window, nullptr, nullptr, RDW_INVALIDATE | RDW_ERASE | RDW_ALLCHILDREN);
 }
 
@@ -682,21 +904,20 @@ void initialize(HWND window, DialogState& state) {
     const int actualDpi = windowDpi(owner ? owner : window);
     MONITORINFO monitor{sizeof(MONITORINFO)};
     GetMonitorInfoW(MonitorFromWindow(owner ? owner : window, MONITOR_DEFAULTTONEAREST), &monitor);
-    state.dpi = fittedDpi(actualDpi, monitor.rcWork.right - monitor.rcWork.left, monitor.rcWork.bottom - monitor.rcWork.top);
+    state.dpi = std::max(96, actualDpi);
     refreshFonts(state);
     state.backgroundBrush = CreateSolidBrush(kBackgroundColor);
     state.cardBrush = CreateSolidBrush(kCardColor); state.inputBrush = CreateSolidBrush(kInputColor);
     const auto px = [&state](int v) { return MulDiv(v, state.dpi, 96); };
-    RECT bounds{0, 0, px(kLayoutWidth), px(kLayoutHeight)};
-    windowBounds(window, bounds, actualDpi);
-    RECT ownerRect = monitor.rcWork;
-    if (owner) GetWindowRect(owner, &ownerRect);
-    const int width = bounds.right - bounds.left, height = bounds.bottom - bounds.top;
-    const int left = std::max(monitor.rcWork.left, std::min(monitor.rcWork.right - width,
-        ownerRect.left + ((ownerRect.right - ownerRect.left) - width) / 2));
-    const int top = std::max(monitor.rcWork.top, std::min(monitor.rcWork.bottom - height,
-        ownerRect.top + ((ownerRect.bottom - ownerRect.top) - height) / 2));
-    SetWindowPos(window, nullptr, left, top, width, height, SWP_NOZORDER);
+    const int workWidth = monitor.rcWork.right - monitor.rcWork.left;
+    const int workHeight = monitor.rcWork.bottom - monitor.rcWork.top;
+    const int width = std::max(MulDiv(720, state.dpi, 96), workWidth * 3 / 5);
+    const int height = std::max(MulDiv(560, state.dpi, 96), workHeight * 7 / 10);
+    const int left = monitor.rcWork.left + (workWidth - std::min(width, workWidth)) / 2;
+    const int top = monitor.rcWork.top + (workHeight - std::min(height, workHeight)) / 2;
+    const auto style = GetWindowLongPtrW(window, GWL_STYLE);
+    SetWindowLongPtrW(window, GWL_STYLE, style | WS_THICKFRAME | WS_MAXIMIZEBOX);
+    SetWindowPos(window, nullptr, left, top, std::min(width, workWidth), std::min(height, workHeight), SWP_NOZORDER | SWP_FRAMECHANGED);
     // Optional Windows 10/11 dark title bar; no new link or runtime dependency.
     if (const auto dwm = LoadLibraryExW(L"dwmapi.dll", nullptr, LOAD_LIBRARY_SEARCH_SYSTEM32)) {
         using SetAttribute = HRESULT(WINAPI*)(HWND, DWORD, LPCVOID, DWORD);
@@ -714,65 +935,53 @@ void initialize(HWND window, DialogState& state) {
         const auto original = reinterpret_cast<WNDPROC>(SetWindowLongPtrW(c, GWLP_WNDPROC, reinterpret_cast<LONG_PTR>(buttonProcedure)));
         SetPropW(c, L"Live2DOriginalButtonProc", reinterpret_cast<HANDLE>(original)); return c;
     };
-    auto heading = label(uiText(L"Import Motions & Expressions", L"导入动作与表情"), 24, 22, 600, 38, kHeading);
+    auto heading = label(uiText(L"Import Motions & Expressions", L"导入动作与表情"), 0, 0, 10, 10, kHeading);
     SendMessageW(heading, WM_SETFONT, reinterpret_cast<WPARAM>(state.titleFont), TRUE);
-    label(uiText(L"Choose a motion and expression, preview them, then add both to the timeline.", L"选好动作与表情，预览后一起添加到时间线。"), 26, 67, 720, 24, kSubtitle);
-    auto modelName = animationName(state.pending.modelPath);
-    if (hasSuffix(modelName, L".model3.json")) modelName.resize(modelName.size() - 12);
-    label((std::wstring(uiText(L"Current model  ·  ", L"当前模型  ·  ")) + modelName).c_str(), 708, 37, 308, 28, kModelPath);
+    label(uiText(L"Choose a motion and expression, preview them, then add both to the timeline.", L"选好动作与表情，预览后一起添加到时间线。"), 0, 0, 10, 10, kSubtitle);
     for (const bool expression : {false, true}) {
         auto& list = expression ? state.expressions : state.motions;
-        const int x = expression ? 294 : 24;
-        auto title = label(expression ? uiText(L"Expression", L"表情") : uiText(L"Motion", L"动作"), x + 16, 122, 124, 28);
+        auto title = label(expression ? uiText(L"Expression", L"表情") : uiText(L"Motion", L"动作"), 0, 0, 10, 10,
+            expression ? kExpressionTitle : kMotionTitle);
         SendMessageW(title, WM_SETFONT, reinterpret_cast<WPARAM>(state.boldFont), TRUE);
-        label(uiText(L"Loading", L"加载中"), x + 152, 126, 90, 22, expression ? kExpressionCount : kMotionCount, true);
-        label(uiText(L"Search", L"搜索"), x + 16, 168, 62, 22, expression ? kExpressionSearchHint : kMotionSearchHint, true);
-        auto search = addControl(window, state, L"EDIT", L"", ES_AUTOHSCROLL | WS_TABSTOP,
-            0, x + 80, 166, 160, 28, list.searchId);
+        label(uiText(L"Loading", L"加载中"), 0, 0, 10, 10, expression ? kExpressionCount : kMotionCount, true);
+        addControl(window, state, L"STATIC", uiText(L"Search", L"搜索"), SS_OWNERDRAW, 0, 0, 0, 10, 10,
+            expression ? kExpressionSearchHint : kMotionSearchHint);
+        auto search = addControl(window, state, L"EDIT", L"", ES_AUTOHSCROLL | WS_TABSTOP, 0, 0, 0, 10, 10, list.searchId);
         SendMessageW(search, EM_SETCUEBANNER, TRUE, reinterpret_cast<LPARAM>(expression ? uiText(L"Search expressions...", L"搜索表情…") : uiText(L"Search motions...", L"搜索动作…")));
         SendMessageW(search, EM_SETLIMITTEXT, 1024, 0);
         const auto listControl = addControl(window, state, L"LISTBOX", L"", LBS_NOTIFY | LBS_NOINTEGRALHEIGHT |
-            LBS_OWNERDRAWFIXED | LBS_HASSTRINGS | WS_VSCROLL | WS_TABSTOP, 0, x + 12, 204, 234, 158, list.listId);
+            LBS_OWNERDRAWFIXED | LBS_HASSTRINGS | WS_VSCROLL | WS_TABSTOP, 0, 0, 0, 10, 10, list.listId);
         SendMessageW(listControl, LB_SETITEMHEIGHT, 0, px(32));
-        button(expression ? uiText(L"+ Expression File", L"＋ 外部表情文件") : uiText(L"+ Motion File", L"＋ 外部动作文件"), x + 16, 372, 226, 30,
-            expression ? kBrowseExpression : kBrowseMotion);
-        label(uiText(L"Selected", L"已选"), x + 16, 413, 70, 22, 0, true);
-        label(expression ? uiText(L"No expression", L"未选择表情") : uiText(L"No motion", L"未选择动作"), x + 88, 411, 156, 24, list.pathId);
+        const auto originalList = reinterpret_cast<WNDPROC>(SetWindowLongPtrW(listControl, GWLP_WNDPROC, reinterpret_cast<LONG_PTR>(listProcedure)));
+        SetPropW(listControl, L"Live2DOriginalListProc", reinterpret_cast<HANDLE>(originalList));
+        label(uiText(L"Selected", L"已选"), 0, 0, 10, 10, expression ? kExpressionSelectedCaption : kMotionSelectedCaption, true);
+        label(expression ? uiText(L"No expression", L"未选择表情") : uiText(L"No motion", L"未选择动作"), 0, 0, 10, 10, list.pathId);
     }
-    auto previewTitle = label(uiText(L"Live Preview", L"实时预览"), 592, 124, 190, 26);
+    auto previewTitle = label(uiText(L"Live Preview", L"实时预览"), 0, 0, 10, 10, kPreviewTitle);
     SendMessageW(previewTitle, WM_SETFONT, reinterpret_cast<WPARAM>(state.boldFont), TRUE);
-    button(uiText(L"Half", L"半身"), 834, 118, 78, 32, kUpperBody);
-    button(uiText(L"Full", L"全身"), 918, 118, 78, 32, kFullBody);
-    addControl(window, state, L"STATIC", L"", SS_OWNERDRAW, 0, 592, 158, 406, 400, kPreview);
-    button(uiText(L"Pause", L"暂停"), 592, 572, 76, 30, kPlay);
-    const auto scrub = addControl(window, state, L"STATIC", L"", SS_OWNERDRAW | SS_NOTIFY | WS_TABSTOP, 0, 676, 575, 200, 26, kScrub);
+    button(uiText(L"Half", L"半身"), 0, 0, 10, 10, kUpperBody);
+    button(uiText(L"Full", L"全身"), 0, 0, 10, 10, kFullBody);
+    addControl(window, state, L"STATIC", L"", SS_OWNERDRAW, 0, 0, 0, 10, 10, kPreview);
+    button(uiText(L"Pause", L"暂停"), 0, 0, 10, 10, kPlay);
+    const auto scrub = addControl(window, state, L"STATIC", L"", SS_OWNERDRAW | SS_NOTIFY | WS_TABSTOP, 0, 0, 0, 10, 10, kScrub);
     const auto originalScrub = reinterpret_cast<WNDPROC>(SetWindowLongPtrW(scrub, GWLP_WNDPROC, reinterpret_cast<LONG_PTR>(buttonProcedure)));
     SetPropW(scrub, L"Live2DOriginalButtonProc", reinterpret_cast<HANDLE>(originalScrub));
-    label(uiText(L"0.00 / 3.00 s", L"0.00 / 3.00 秒"), 888, 576, 114, 24, kTime, true);
-    label(uiText(L"Loading preview. The first load can take a few seconds...", L"正在加载预览，首次加载需要数秒…"), 576, 625, 440, 22, kStatus, true);
-    label(uiText(L"Transition", L"过渡时长"), 40, 470, 166, 20, kTransitionTitle);
-    // The edit sits centered inside a 32px visual field, matching the buttons.
-    // A single-line native edit has no vertical-alignment option of its own.
-    auto edit = addControl(window, state, L"EDIT", std::to_wstring(state.transitionFrames).c_str(),
-        ES_NUMBER | ES_CENTER | ES_AUTOHSCROLL | WS_TABSTOP, 0, 46, 502, 78, 20, kTransition);
-    SendMessageW(edit, EM_SETLIMITTEXT, 6, 0);
-    addControl(window, state, L"STATIC", uiText(L"frames", L"帧"), SS_CENTERIMAGE, 0, 128, 496, 78, 32, kTransitionUnit);
-    label(uiText(L"Overshoot", L"回弹幅度"), 250, 470, 286, 20, kBounceTitle);
-    button(uiText(L"None", L"无"), 250, 496, 90, 32, kBounceNone);
-    button(uiText(L"Soft", L"轻柔"), 348, 496, 90, 32, kBounceGentle);
-    button(uiText(L"Strong", L"明显"), 446, 496, 90, 32, kBounceStrong);
-    label(uiText(L"Placement", L"添加位置"), 40, 560, 496, 20, kPlacementTitle);
-    button(uiText(L"After Previous Clip", L"接在上一动作后"), 40, 586, 242, 32, kAppendClip);
-    button(uiText(L"At Current Time", L"从当前时间开始"), 294, 586, 242, 32, kAtPlayhead);
-    label(uiText(L"Choose a motion or expression to preview and import.", L"选择动作或表情，即可预览并导入。"), 26, 663, 640, 24, kImportSummary, true);
-    button(uiText(L"Cancel", L"取消"), 706, 651, 94, 36, IDCANCEL);
-    button(uiText(L"Add to Timeline", L"添加到时间线"), 814, 651, 202, 36, IDOK);
+    label(uiText(L"0.00 / 3.00 s", L"0.00 / 3.00 秒"), 0, 0, 10, 10, kTime, true);
+    label(uiText(L"Loading preview. The first load can take a few seconds...", L"正在加载预览，首次加载需要数秒…"), 0, 0, 10, 10, kStatus, true);
+    label(uiText(L"Transition", L"过渡时长"), 0, 0, 10, 10, kTransitionTitle);
+    label(uiText(L"Overshoot", L"回弹幅度"), 0, 0, 10, 10, kBounceTitle);
+    label(uiText(L"Placement", L"添加位置"), 0, 0, 10, 10, kPlacementTitle);
+    fillSettingCombo(addCombo(window, state, 0, 0, 10, 28, kTransition), state, kTransitionChoices, 5, state.transitionFrames);
+    fillSettingCombo(addCombo(window, state, 0, 0, 10, 28, kBounceNone), state, kReboundChoices, 3, state.transitionCurve);
+    fillSettingCombo(addCombo(window, state, 0, 0, 10, 28, kAppendClip), state, kPlacementChoices, 2, state.appendClip ? 1 : 0);
+    button(uiText(L"Add to Timeline", L"添加到时间线"), 0, 0, 10, 10, IDOK);
+    layoutDialog(window, state);
     SendMessageW(window, DM_SETDEFID, IDOK, 0);
     state.controlsReady = true;
     rebuildList(window, state, state.motions); rebuildList(window, state, state.expressions);
     state.lastTick = GetTickCount64();
     if (state.previewEnabled) {
-        state.worker.start(state.pending.modelPath); submitPreview(state);
+        state.worker.start(state.pending.modelPath); submitPreview(window, state);
         if (!SetTimer(window, kPreviewTimer, 42, nullptr)) throw std::runtime_error("Cannot start the preview timer.");
     }
     SetFocus(GetDlgItem(window, kSearchMotion));
@@ -788,23 +997,32 @@ void paintDialog(HWND window, HDC dc, const DialogState& state) {
         ExcludeClipRect(dc, rect.left, rect.top, rect.right, rect.bottom);
     }
     RECT client{}; GetClientRect(window, &client); FillRect(dc, &client, state.backgroundBrush);
-    const auto px = [&state](int v) { return MulDiv(v, state.dpi, 96); };
-    for (const auto& rect : {RECT{24, 106, 282, 446}, RECT{294, 106, 552, 446}, RECT{574, 106, 1016, 618},
-            RECT{24, 458, 222, 538}, RECT{234, 458, 552, 538}, RECT{24, 550, 552, 628}})
-        rounded(dc, {px(rect.left), px(rect.top), px(rect.right), px(rect.bottom)}, kCardColor, kBorderColor, px(14));
-    for (const int x : {24, 294})
-        rounded(dc, {px(x + 12), px(160), px(x + 246), px(198)}, kInputColor, kBorderColor, px(9));
-    rounded(dc, {px(40), px(496), px(162), px(528)}, kInputColor, kBorderColor, px(8));
-    const auto pen = CreatePen(PS_SOLID, 1, kBorderColor);
-    const auto previous = SelectObject(dc, pen);
-    MoveToEx(dc, px(24), px(641), nullptr); LineTo(dc, px(1016), px(641)); SelectObject(dc, previous); DeleteObject(pen);
+    const auto px = [&state](RECT rect) {
+        return RECT{MulDiv(rect.left, state.dpi, 96), MulDiv(rect.top, state.dpi, 96),
+            MulDiv(rect.right, state.dpi, 96), MulDiv(rect.bottom, state.dpi, 96)};
+    };
+    for (const auto& rect : {state.motionCard, state.expressionCard, state.previewCard,
+            state.transitionCard, state.reboundCard, state.placementCard})
+        if (rect.right > rect.left && rect.bottom > rect.top)
+            rounded(dc, px(rect), kCardColor, kBorderColor, MulDiv(14, state.dpi, 96));
+    for (const int id : {kSearchMotion, kSearchExpression})
+        for (const auto& control : state.controlLayouts) if (GetDlgCtrlID(control.window) == id) {
+            RECT well{control.x - 6, control.y - 4, control.x + control.width + 6, control.y + control.height + 4};
+            rounded(dc, px(well), kInputColor, kBorderColor, MulDiv(9, state.dpi, 96));
+        }
+    for (const auto& control : state.controlLayouts) if (GetDlgCtrlID(control.window) == IDOK) {
+        const auto pen = CreatePen(PS_SOLID, 1, kBorderColor);
+        const auto previous = SelectObject(dc, pen);
+        const int y = MulDiv(control.y - 10, state.dpi, 96);
+        MoveToEx(dc, MulDiv(20, state.dpi, 96), y, nullptr);
+        LineTo(dc, client.right - MulDiv(20, state.dpi, 96), y);
+        SelectObject(dc, previous); DeleteObject(pen);
+    }
     RestoreDC(dc, saved);
 }
 
 bool buttonChosen(int id, const DialogState& state) {
-    return (id == kUpperBody && state.upperBody) || (id == kFullBody && !state.upperBody) ||
-        (id == kAppendClip && state.appendClip) || (id == kAtPlayhead && !state.appendClip) ||
-        (id >= kBounceNone && id <= kBounceStrong && state.transitionCurve == 3 + id - kBounceNone);
+    return (id == kUpperBody && state.upperBody) || (id == kFullBody && !state.upperBody);
 }
 void drawButton(const DRAWITEMSTRUCT& item, const DialogState& state) {
     const bool enabled = !(item.itemState & ODS_DISABLED), primary = item.CtlID == IDOK;
@@ -826,28 +1044,57 @@ void drawButton(const DRAWITEMSTRUCT& item, const DialogState& state) {
     }
 }
 
+std::wstring cellLabel(const PickerList& list, int cell) {
+    if (cell <= 0) return list.expression ? uiText(L"(Skip expression)", L"（不导入表情）") : uiText(L"(Skip motion)", L"（不导入动作）");
+    return animationName(list.entries[list.visible[static_cast<size_t>(cell - 1)]].path);
+}
+
+void drawSearchHint(const DRAWITEMSTRUCT& item, const DialogState& state) {
+    FillRect(item.hDC, &item.rcItem, state.cardBrush);
+    SetBkMode(item.hDC, TRANSPARENT);
+    SetTextColor(item.hDC, kMutedColor);
+    auto rect = item.rcItem;
+    const auto old = SelectObject(item.hDC, state.font);
+    const auto text = controlText(item.hwndItem);
+    DrawTextW(item.hDC, text.c_str(), -1, &rect, DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_END_ELLIPSIS | DT_NOPREFIX);
+    SelectObject(item.hDC, old);
+}
+
 void drawListItem(const DRAWITEMSTRUCT& item, const DialogState& state) {
     if (item.itemID == static_cast<UINT>(-1)) return;
-    const bool selected = item.itemState & ODS_SELECTED;
-    const auto brush = CreateSolidBrush(selected ? RGB(56, 49, 83) : kCardColor);
-    FillRect(item.hDC, &item.rcItem, brush); DeleteObject(brush);
-    auto textRect = item.rcItem;
-    textRect.left += MulDiv(31, state.dpi, 96); textRect.right -= MulDiv(8, state.dpi, 96);
-    const int count = static_cast<int>(SendMessageW(item.hwndItem, LB_GETTEXTLEN, item.itemID, 0));
-    if (count < 0) return;
-    std::wstring text(static_cast<size_t>(count + 1), L'\0');
-    SendMessageW(item.hwndItem, LB_GETTEXT, item.itemID, reinterpret_cast<LPARAM>(text.data()));
-    SetBkMode(item.hDC, TRANSPARENT); SetTextColor(item.hDC, item.itemID ? kTextColor : kMutedColor);
-    const auto old = SelectObject(item.hDC, state.font);
-    DrawTextW(item.hDC, text.c_str(), -1, &textRect, DT_VCENTER | DT_SINGLELINE | DT_END_ELLIPSIS | DT_NOPREFIX);
-    SelectObject(item.hDC, old);
-    const int radius = MulDiv(5, state.dpi, 96), cx = item.rcItem.left + MulDiv(15, state.dpi, 96), cy = (item.rcItem.top + item.rcItem.bottom) / 2;
-    const auto pen = CreatePen(PS_SOLID, 1, selected ? kAccentColor : kBorderColor);
-    const auto dot = CreateSolidBrush(selected ? kAccentColor : kCardColor);
-    const auto oldPen = SelectObject(item.hDC, pen), oldBrush = SelectObject(item.hDC, dot);
-    Ellipse(item.hDC, cx - radius, cy - radius, cx + radius, cy + radius);
-    SelectObject(item.hDC, oldPen); SelectObject(item.hDC, oldBrush); DeleteObject(pen); DeleteObject(dot);
-    if (item.itemState & ODS_FOCUS) { auto rect = item.rcItem; InflateRect(&rect, -2, -2); DrawFocusRect(item.hDC, &rect); }
+    const auto& list = item.CtlID == kExpressionList ? state.expressions : state.motions;
+    FillRect(item.hDC, &item.rcItem, state.cardBrush);
+    const int width = std::max(1, static_cast<int>(item.rcItem.right - item.rcItem.left));
+    const int cells = pickerCells(list);
+    const int padX = MulDiv(4, state.dpi, 96), padY = MulDiv(3, state.dpi, 96);
+    for (int column = 0; column < kGridColumns; ++column) {
+        const int cell = static_cast<int>(item.itemID) * kGridColumns + column;
+        if (cell >= cells) break;
+        RECT chip{item.rcItem.left + column * width / kGridColumns, item.rcItem.top,
+            item.rcItem.left + (column + 1) * width / kGridColumns, item.rcItem.bottom};
+        InflateRect(&chip, -padX, -padY);
+        const bool selected = cell == 0 ? list.selected.empty()
+            : list.entries[list.visible[static_cast<size_t>(cell - 1)]].path == list.selected;
+        if (selected) rounded(item.hDC, chip, RGB(56, 49, 83), kAccentColor, MulDiv(8, state.dpi, 96));
+        const int radius = MulDiv(4, state.dpi, 96);
+        const int cx = chip.left + MulDiv(12, state.dpi, 96);
+        const int cy = (chip.top + chip.bottom) / 2;
+        const auto pen = CreatePen(PS_SOLID, 1, selected ? kAccentColor : kBorderColor);
+        const auto dot = CreateSolidBrush(selected ? kAccentColor : kCardColor);
+        const auto oldPen = SelectObject(item.hDC, pen), oldBrush = SelectObject(item.hDC, dot);
+        Ellipse(item.hDC, cx - radius, cy - radius, cx + radius, cy + radius);
+        SelectObject(item.hDC, oldPen); SelectObject(item.hDC, oldBrush); DeleteObject(pen); DeleteObject(dot);
+        RECT textRect = chip;
+        textRect.left = cx + radius + MulDiv(6, state.dpi, 96);
+        textRect.right -= MulDiv(6, state.dpi, 96);
+        const auto text = cellLabel(list, cell);
+        SetBkMode(item.hDC, TRANSPARENT);
+        SetTextColor(item.hDC, cell == 0 ? kMutedColor : kTextColor);
+        const auto old = SelectObject(item.hDC, state.font);
+        DrawTextW(item.hDC, text.c_str(), -1, &textRect, DT_VCENTER | DT_SINGLELINE | DT_END_ELLIPSIS | DT_NOPREFIX);
+        SelectObject(item.hDC, old);
+        if (selected && (item.itemState & ODS_FOCUS)) DrawFocusRect(item.hDC, &chip);
+    }
 }
 
 void drawPreviewImage(const DRAWITEMSTRUCT& item, const DialogState& state) {
@@ -858,14 +1105,17 @@ void drawPreviewImage(const DRAWITEMSTRUCT& item, const DialogState& state) {
         DrawTextW(item.hDC, uiText(L"Preparing the character preview...", L"正在准备角色预览…"), -1, &rect, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
         SelectObject(item.hDC, old); return;
     }
-    const float scale = std::min(static_cast<float>(item.rcItem.right - item.rcItem.left) / state.frame.width,
-        static_cast<float>(item.rcItem.bottom - item.rcItem.top) / state.frame.height);
-    const int width = static_cast<int>(state.frame.width * scale), height = static_cast<int>(state.frame.height * scale);
+    const int destWidth = item.rcItem.right - item.rcItem.left, destHeight = item.rcItem.bottom - item.rcItem.top;
+    const bool native = state.frame.width == destWidth && state.frame.height == destHeight;
+    const float scale = native ? 1.f : std::min(static_cast<float>(destWidth) / state.frame.width,
+        static_cast<float>(destHeight) / state.frame.height);
+    const int width = native ? destWidth : static_cast<int>(state.frame.width * scale);
+    const int height = native ? destHeight : static_cast<int>(state.frame.height * scale);
     BITMAPINFO info{};
     info.bmiHeader.biSize = sizeof(BITMAPINFOHEADER); info.bmiHeader.biWidth = state.frame.width;
     info.bmiHeader.biHeight = -state.frame.height; info.bmiHeader.biPlanes = 1;
     info.bmiHeader.biBitCount = 32; info.bmiHeader.biCompression = BI_RGB;
-    SetStretchBltMode(item.hDC, HALFTONE); SetBrushOrgEx(item.hDC, 0, 0, nullptr);
+    SetStretchBltMode(item.hDC, native ? COLORONCOLOR : HALFTONE); SetBrushOrgEx(item.hDC, 0, 0, nullptr);
     StretchDIBits(item.hDC, item.rcItem.left + (item.rcItem.right - item.rcItem.left - width) / 2,
         item.rcItem.top + (item.rcItem.bottom - item.rcItem.top - height) / 2, width, height,
         0, 0, state.frame.width, state.frame.height, state.frame.bgra.data(), &info, DIB_RGB_COLORS, SRCCOPY);
@@ -884,6 +1134,26 @@ void drawPreview(const DRAWITEMSTRUCT& item, const DialogState& state) {
     drawPreviewImage(pending, state);
     BitBlt(item.hDC, item.rcItem.left, item.rcItem.top, width, height, buffer, 0, 0, SRCCOPY);
     SelectObject(buffer, old); DeleteObject(bitmap); DeleteDC(buffer);
+}
+
+void drawSettingCombo(const DRAWITEMSTRUCT& item, const DialogState& state) {
+    if (item.itemID == static_cast<UINT>(-1)) return;
+    const bool closed = (item.itemState & ODS_COMBOBOXEDIT) != 0;
+    const bool selected = (item.itemState & ODS_SELECTED) != 0 && !closed;
+    const bool disabled = (item.itemState & ODS_DISABLED) != 0;
+    const auto fill = closed ? kInputColor : selected ? RGB(56, 49, 83) : kCardColor;
+    const auto brush = CreateSolidBrush(fill);
+    FillRect(item.hDC, &item.rcItem, brush);
+    DeleteObject(brush);
+    wchar_t text[128]{};
+    SendMessageW(item.hwndItem, CB_GETLBTEXT, item.itemID, reinterpret_cast<LPARAM>(text));
+    SetBkMode(item.hDC, TRANSPARENT);
+    SetTextColor(item.hDC, disabled ? RGB(128, 126, 148) : kTextColor);
+    auto rect = item.rcItem;
+    InflateRect(&rect, -8, 0);
+    const auto old = SelectObject(item.hDC, state.font);
+    DrawTextW(item.hDC, text, -1, &rect, DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_END_ELLIPSIS);
+    SelectObject(item.hDC, old);
 }
 
 void drawScrub(const DRAWITEMSTRUCT& item, const DialogState& state) {
@@ -912,6 +1182,21 @@ INT_PTR CALLBACK dialogProcedure(HWND window, UINT message, WPARAM wParam, LPARA
             if (state->controlsReady) reflowDpi(window, *state, LOWORD(wParam), *reinterpret_cast<const RECT*>(lParam));
             return TRUE;
         }
+        if (message == WM_SIZE && state->controlsReady && wParam != SIZE_MINIMIZED) {
+            layoutDialog(window, *state);
+            RECT preview{};
+            if (const auto control = GetDlgItem(window, kPreview)) GetClientRect(control, &preview);
+            if (preview.right != state->frame.width || preview.bottom != state->frame.height)
+                state->previewDirty = true;
+            InvalidateRect(window, nullptr, FALSE);
+            return TRUE;
+        }
+        if (message == WM_GETMINMAXINFO) {
+            auto* limit = reinterpret_cast<MINMAXINFO*>(lParam);
+            limit->ptMinTrackSize.x = MulDiv(860, state->dpi, 96);
+            limit->ptMinTrackSize.y = MulDiv(560, state->dpi, 96);
+            return TRUE;
+        }
         if (message == WM_ERASEBKGND) return TRUE; // WM_PAINT draws the complete background without an intermediate erase.
         if (message == WM_PAINT) {
             PAINTSTRUCT paint{}; const auto dc = BeginPaint(window, &paint); paintDialog(window, dc, *state); EndPaint(window, &paint); return TRUE;
@@ -921,20 +1206,19 @@ INT_PTR CALLBACK dialogProcedure(HWND window, UINT message, WPARAM wParam, LPARA
             const auto dc = reinterpret_cast<HDC>(wParam);
             const auto control = reinterpret_cast<HWND>(lParam);
             const int id = GetDlgCtrlID(control);
-            const bool input = id == kSearchMotion || id == kSearchExpression || id == kTransition ||
-                id == kMotionSearchHint || id == kExpressionSearchHint;
-            RECT rect{}; GetWindowRect(control, &rect); MapWindowPoints(nullptr, window, reinterpret_cast<POINT*>(&rect), 2);
-            const int y = MulDiv(rect.top, 96, state->dpi);
-            const bool background = y < 106 || y >= 618;
-            const bool muted = id == kStatus || id == kSubtitle || id == kModelPath || id == kTime || id == kMotionCount ||
-                id == kExpressionCount || id == kImportSummary || id == kMotionSearchHint || id == kExpressionSearchHint;
+            const bool input = id == kSearchMotion || id == kSearchExpression;
+            const bool page = id == kHeading || id == kSubtitle;
+            const bool muted = id == kStatus || id == kSubtitle || id == kTime || id == kMotionCount ||
+                id == kExpressionCount || id == kMotionSearchHint || id == kExpressionSearchHint ||
+                id == kMotionSelectedCaption || id == kExpressionSelectedCaption;
             SetTextColor(dc, muted ? kMutedColor : kTextColor);
-            SetBkColor(dc, input ? kInputColor : background ? kBackgroundColor : kCardColor);
-            return reinterpret_cast<INT_PTR>(input ? state->inputBrush : background ? state->backgroundBrush : state->cardBrush);
+            SetBkColor(dc, input ? kInputColor : page ? kBackgroundColor : kCardColor);
+            return reinterpret_cast<INT_PTR>(input ? state->inputBrush : page ? state->backgroundBrush : state->cardBrush);
         }
         if (message == WM_MEASUREITEM) {
             auto* measure = reinterpret_cast<MEASUREITEMSTRUCT*>(lParam);
             if (measure->CtlType == ODT_LISTBOX) { measure->itemHeight = MulDiv(32, state->dpi, 96); return TRUE; }
+            if (measure->CtlType == ODT_COMBOBOX) { measure->itemHeight = MulDiv(28, state->dpi, 96); return TRUE; }
         }
         if (message == WM_CLOSE) { EndDialog(window, IDCANCEL); return TRUE; }
         if (message == WM_DESTROY) { KillTimer(window, kPreviewTimer); return TRUE; }
@@ -942,6 +1226,8 @@ INT_PTR CALLBACK dialogProcedure(HWND window, UINT message, WPARAM wParam, LPARA
         if (message == WM_DRAWITEM) {
             const auto& item = *reinterpret_cast<const DRAWITEMSTRUCT*>(lParam);
             if (wParam == kPreview) drawPreview(item, *state);
+            else if (wParam == kMotionSearchHint || wParam == kExpressionSearchHint) drawSearchHint(item, *state);
+            else if (wParam == kTransition || wParam == kBounceNone || wParam == kAppendClip) drawSettingCombo(item, *state);
             else if (wParam == kScrub) drawScrub(item, *state);
             else if (item.CtlType == ODT_BUTTON) drawButton(item, *state);
             else if (item.CtlType == ODT_LISTBOX) drawListItem(item, *state);
@@ -978,12 +1264,17 @@ INT_PTR CALLBACK dialogProcedure(HWND window, UINT message, WPARAM wParam, LPARA
         }
         if (message == WM_COMMAND) {
             const int id = LOWORD(wParam), notification = HIWORD(wParam);
-            if (id >= kBounceNone && id <= kBounceStrong) {
-                if (notification != BN_CLICKED || !state->modelValid || state->motions.selected.empty() ||
-                    !IsWindowEnabled(GetDlgItem(window, id))) return TRUE;
-                state->transitionCurve = 3 + id - kBounceNone;
-                for (const int control : {kBounceNone, kBounceGentle, kBounceStrong})
-                    InvalidateRect(GetDlgItem(window, control), nullptr, FALSE);
+            if (id == kTransition && notification == CBN_SELCHANGE) {
+                state->transitionFrames = selectedSetting(GetDlgItem(window, id), kTransitionChoices, 5, state->extraTransitionFrames);
+                return TRUE;
+            }
+            if (id == kBounceNone && notification == CBN_SELCHANGE) {
+                if (!state->modelValid || state->motions.selected.empty() || !IsWindowEnabled(GetDlgItem(window, id))) return TRUE;
+                state->transitionCurve = selectedSetting(GetDlgItem(window, id), kReboundChoices, 3, state->transitionCurve);
+                return TRUE;
+            }
+            if (id == kAppendClip && notification == CBN_SELCHANGE) {
+                state->appendClip = selectedSetting(GetDlgItem(window, id), kPlacementChoices, 2, state->appendClip ? 1 : 0) != 0;
                 return TRUE;
             }
             if (id == kUpperBody || id == kFullBody) {
@@ -994,12 +1285,6 @@ INT_PTR CALLBACK dialogProcedure(HWND window, UINT message, WPARAM wParam, LPARA
                 InvalidateRect(GetDlgItem(window, kPreview), nullptr, FALSE);
                 return TRUE;
             }
-            if (id == kAppendClip || id == kAtPlayhead) {
-                state->appendClip = id == kAppendClip;
-                InvalidateRect(GetDlgItem(window, kAppendClip), nullptr, FALSE);
-                InvalidateRect(GetDlgItem(window, kAtPlayhead), nullptr, FALSE);
-                return TRUE;
-            }
             for (auto* list : {&state->motions, &state->expressions}) {
                 if (id == list->searchId && notification == EN_CHANGE && state->controlsReady) {
                     list->query = controlText(GetDlgItem(window, id));
@@ -1007,11 +1292,23 @@ INT_PTR CALLBACK dialogProcedure(HWND window, UINT message, WPARAM wParam, LPARA
                     return TRUE;
                 }
                 if (id == list->listId && !state->rebuilding && (notification == LBN_SELCHANGE || notification == LBN_DBLCLK)) {
-                    const auto row = SendDlgItemMessageW(window, id, LB_GETCURSEL, 0, 0);
-                    if (row == 0) list->selected.clear();
-                    else if (row > 0 && static_cast<size_t>(row) <= list->visible.size())
-                        list->selected = list->entries[list->visible[static_cast<size_t>(row - 1)]].path;
-                    else return TRUE; // Filtering out the current selection never clears it.
+                    const auto control = GetDlgItem(window, id);
+                    int cell = -1;
+                    if (const auto stored = GetPropW(control, L"Live2DGridCell")) {
+                        cell = static_cast<int>(reinterpret_cast<INT_PTR>(stored)) - 1;
+                        RemovePropW(control, L"Live2DGridCell");
+                        list->pressedCell = -1;
+                    } else if (list->pressedCell >= 0) {
+                        cell = list->pressedCell;
+                        list->pressedCell = -1;
+                    } else {
+                        const auto row = SendMessageW(control, LB_GETCURSEL, 0, 0);
+                        if (row < 0) return TRUE; // Filtering out the current selection never clears it.
+                        cell = static_cast<int>(row) * kGridColumns + list->gridColumn;
+                        if (cell >= pickerCells(*list)) cell = pickerCells(*list) - 1;
+                    }
+                    if (!applyListCell(*list, cell)) return TRUE;
+                    InvalidateRect(control, nullptr, FALSE);
                     selectionChanged(window, *state);
                     return TRUE;
                 }
@@ -1040,14 +1337,12 @@ INT_PTR CALLBACK dialogProcedure(HWND window, UINT message, WPARAM wParam, LPARA
                     return TRUE;
                 }
                 if (!state->modelValid) return TRUE;
-                const auto value = controlText(GetDlgItem(window, kTransition));
-                if (value.empty() || value.find_first_not_of(L"0123456789") != std::wstring::npos)
-                    throw std::runtime_error("Enter a non-negative whole number of transition frames.");
-                const auto frames = std::stoll(value);
-                if (frames > kMaximumTransitionFrames) throw std::runtime_error("Transition frames must be between 0 and 100000.");
+                state->transitionFrames = selectedSetting(GetDlgItem(window, kTransition), kTransitionChoices, 5, state->extraTransitionFrames);
+                state->transitionCurve = selectedSetting(GetDlgItem(window, kBounceNone), kReboundChoices, 3, state->transitionCurve);
+                state->appendClip = selectedSetting(GetDlgItem(window, kAppendClip), kPlacementChoices, 2, state->appendClip ? 1 : 0) != 0;
                 if (!std::filesystem::is_regular_file(state->pending.modelPath))
                     throw std::runtime_error("The model file is missing. Restore its original path before importing.");
-                state->result = prepareImport(*state, state->appendClip, static_cast<int>(frames));
+                state->result = prepareImport(*state, state->appendClip, state->transitionFrames);
                 EndDialog(window, IDOK);
                 return TRUE;
             }
@@ -1074,8 +1369,8 @@ bool runDialog(DialogState& state, void* ownerWindow) {
     } data{};
     static_assert(offsetof(Template, menu) == 18, "DLGTEMPLATE must use Windows packing.");
     wcsncpy_s(data.title, uiText(L"AeGO Flash - Import Clips", L"AeGO Flash — 导入动作与表情"), _TRUNCATE);
-    data.dialog.style = WS_POPUP | WS_CAPTION | WS_SYSMENU | DS_MODALFRAME | WS_CLIPCHILDREN;
-    data.dialog.dwExtendedStyle = WS_EX_DLGMODALFRAME;
+    data.dialog.style = WS_POPUP | WS_CAPTION | WS_SYSMENU | WS_THICKFRAME | WS_MAXIMIZEBOX | WS_CLIPCHILDREN;
+    data.dialog.dwExtendedStyle = 0;
     data.dialog.cx = 600;
     data.dialog.cy = 360;
     const auto result = DialogBoxIndirectParamW(GetModuleHandleW(nullptr), &data.dialog,

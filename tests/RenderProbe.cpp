@@ -211,6 +211,7 @@ void testExpressions(const l2dae::RenderRequest& original, const std::wstring& p
     const auto exponent = files.write(L"exponent.exp3.json", "{\"Parameters\":[{\"Id\":\"ParamAngleX\",\"Value\":1.2e1}]}");
     l2dae::validateExpression(exponent);
     l2dae::validateExpression(files.write(L"neutral.exp3.json", "{\"Type\":\"Live2D Expression\",\"Parameters\":[]}"));
+    l2dae::validateExpression(files.write(L"short-type.exp3.json", "{\"Type\":\"Expression\",\"Parameters\":[]}"));
 
     auto base = original;
     base.motionPath = files.motion(8);

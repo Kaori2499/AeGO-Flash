@@ -165,6 +165,7 @@ std::vector<Csm::csmByte> readJson(const fs::path& path) {
             else output += utf8(decoded);
         } else output += ch;
     }
+    output = terminateCubismNumbers(output);
     return {output.begin(), output.end()};
 }
 
@@ -394,7 +395,11 @@ std::shared_ptr<ExpressionData> readExpression(const fs::path& path) {
     std::unique_ptr<Csm::Utils::CubismJson, JsonDeleter> json(Csm::Utils::CubismJson::Create(bytes.data(), static_cast<int>(bytes.size())));
     if (!json || !json->GetRoot().IsMap()) throw std::runtime_error("Expression must be a JSON object.");
     auto& root = json->GetRoot();
-    if (!root["Type"].IsNull() && (!root["Type"].IsString() || std::strcmp(root["Type"].GetRawString(), "Live2D Expression") != 0))
+    // Cubism Editor writes "Live2D Expression". Game exports often write "Expression".
+    // The native SDK ignores Type, so both are the same expression document.
+    const auto* type = root["Type"].GetRawString();
+    if (!root["Type"].IsNull() && (!root["Type"].IsString() ||
+        (std::strcmp(type, "Live2D Expression") != 0 && std::strcmp(type, "Expression") != 0)))
         throw std::runtime_error("Unsupported expression Type; expected Live2D Expression.");
     auto& parameters = root["Parameters"];
     if (!parameters.IsArray() || parameters.GetSize() > 4096)
@@ -1044,6 +1049,20 @@ public:
             -2.0f * request.offsetY / request.height - centerY * sy);
         auto* renderer = GetRenderer<D3DRenderer>();
         renderer->SetRenderTargetSize(request.width, request.height);
+        // Cubism's default mask target is 256 px. A 2048 px model stretched out of
+        // that buffer looks blocky. Match the mask to the canvas and the frame.
+        const int maskWidth = std::min(kMaxDimension, std::max(request.width, static_cast<int>(std::ceil(canvas.X))));
+        const int maskHeight = std::min(kMaxDimension, std::max(request.height, static_cast<int>(std::ceil(canvas.Y))));
+        const auto resizeMask = [](auto current, int width, int height, auto resize) {
+            if (static_cast<int>(current.X) != width || static_cast<int>(current.Y) != height)
+                resize(static_cast<float>(width), static_cast<float>(height));
+        };
+        if (_model->IsUsingMasking())
+            resizeMask(renderer->GetDrawableClippingMaskBufferSize(), maskWidth, maskHeight,
+                [renderer](float width, float height) { renderer->SetDrawableClippingMaskBufferSize(width, height); });
+        if (_model->IsUsingMaskingForOffscreen())
+            resizeMask(renderer->GetOffscreenClippingMaskBufferSize(), maskWidth, maskHeight,
+                [renderer](float width, float height) { renderer->SetOffscreenClippingMaskBufferSize(width, height); });
         renderer->SetMvpMatrix(&matrix);
         // Model opacity is applied once after compositing, so overlapping meshes fade together.
         renderer->SetModelColor(1, 1, 1, 1);
