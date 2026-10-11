@@ -204,7 +204,19 @@
             "(function(){\n" +
             "var owner=" + owner + ", output=" + output + ", clips=[], active=[], t=time;\n" +
             expressionScan(MOTION_CHANNEL) +
-            "function clock(c,u){return Math.max(0,Math.min(c.duration,c.layer.sourceTime(u)));}\n" +
+            // sourceTime(outPoint) is 0: the layer is already inactive there. Extrapolate
+            // the end clock from the last two samples that are still inside the layer.
+            "function clock(c,u){\n" +
+            " var s;\n" +
+            " if(!(u<c.end) && c.end>c.begin){\n" +
+            "  var span=c.end-c.begin, step=span>1/65536?1/65536:span/2;\n" +
+            "  var t1=c.end-step, t0=t1-step; if(t0<c.begin) t0=c.begin;\n" +
+            "  var s0=c.layer.sourceTime(t0), s1=c.layer.sourceTime(t1), gap=t1-t0;\n" +
+            "  s=gap>0?s1+(s1-s0)*((c.end-t1)/gap):s1;\n" +
+            " }else s=c.layer.sourceTime(u);\n" +
+            " if(!isFinite(s)) s=0;\n" +
+            " return Math.max(0,Math.min(c.duration,s));\n" +
+            "}\n" +
             // Retain curve 1's bounded rebound for previously saved clips.
             // The incoming clip owns the curve; reversed playback changes only
             // the source clock, while a nested clip's exit reverses this envelope.

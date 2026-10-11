@@ -466,6 +466,92 @@ PF_Err readLipAudio(PF_InData* in_data, PF_ParamDef* params[], RenderRequest& re
     return err ? err : cleanupError;
 }
 
+// Same measurement as the dialog preview: ignore faint edges, store an exclusive rect.
+struct CharacterBounds { int left = 0, top = 0, right = 0, bottom = 0; bool valid = false; };
+
+CharacterBounds measureCharacter(const RenderResult& frame) {
+    CharacterBounds bounds;
+    bounds.left = frame.width;
+    bounds.top = frame.height;
+    if (frame.width <= 0 || frame.height <= 0 ||
+        frame.rgba.size() != static_cast<size_t>(frame.width) * frame.height * 4)
+        return {};
+    for (int y = 0; y < frame.height; ++y) for (int x = 0; x < frame.width; ++x) {
+        if (frame.rgba[(static_cast<size_t>(y) * frame.width + x) * 4 + 3] < 16) continue;
+        bounds.left = std::min(bounds.left, x);
+        bounds.top = std::min(bounds.top, y);
+        bounds.right = std::max(bounds.right, x + 1);
+        bounds.bottom = std::max(bounds.bottom, y + 1);
+        bounds.valid = true;
+    }
+    return bounds.valid ? bounds : CharacterBounds{};
+}
+
+struct FramingKey {
+    std::wstring path;
+    int width = 0, height = 0, aspect = 0;
+    bool operator<(const FramingKey& other) const {
+        if (path != other.path) return path < other.path;
+        if (width != other.width) return width < other.width;
+        if (height != other.height) return height < other.height;
+        return aspect < other.aspect;
+    }
+};
+
+std::mutex& framingMutex() {
+    static std::mutex mutex;
+    return mutex;
+}
+std::map<FramingKey, CharacterBounds>& framingCache() {
+    static std::map<FramingKey, CharacterBounds> cache;
+    return cache;
+}
+
+CharacterBounds characterBounds(const RenderRequest& request) {
+    FramingKey key;
+    key.path = request.modelPath;
+    key.width = request.width;
+    key.height = request.height;
+    key.aspect = static_cast<int>(std::lround(request.pixelAspect * 10000.0f));
+    {
+        std::lock_guard<std::mutex> lock(framingMutex());
+        const auto found = framingCache().find(key);
+        if (found != framingCache().end()) return found->second;
+    }
+    RenderRequest neutral;
+    neutral.modelPath = request.modelPath;
+    neutral.width = request.width;
+    neutral.height = request.height;
+    neutral.pixelAspect = request.pixelAspect;
+    const auto bounds = measureCharacter(render(neutral));
+    std::lock_guard<std::mutex> lock(framingMutex());
+    if (framingCache().size() > 64) framingCache().clear();
+    framingCache()[key] = bounds;
+    return bounds;
+}
+
+// Scale 100% matches the dialog: the upper body fills the layer, instead of
+// letterboxing the model's whole canvas. User scale zooms around that framing.
+void frameLikePreview(RenderRequest& request, const CharacterBounds& bounds,
+    float userScale, float userOffsetX, float userOffsetY) {
+    const float width = static_cast<float>(request.width);
+    const float height = static_cast<float>(request.height);
+    const float characterHeight = static_cast<float>(bounds.bottom - bounds.top);
+    const bool framed = bounds.valid && characterHeight > 0.0f && width > 0.0f && height > 0.0f;
+    const float scale = framed
+        ? std::clamp(height * .92f / (characterHeight * .46f) * userScale, .01f, 100.0f)
+        : userScale;
+    request.scale = scale;
+    if (!framed) {
+        request.offsetX = userOffsetX;
+        request.offsetY = userOffsetY;
+        return;
+    }
+    const float centerX = (static_cast<float>(bounds.left) + static_cast<float>(bounds.right)) * .5f;
+    request.offsetX = (width * .5f - centerX) * scale + userOffsetX;
+    request.offsetY = height * .04f - height * .5f - (static_cast<float>(bounds.top) - height * .5f) * scale + userOffsetY;
+}
+
 PF_Err renderFrame(PF_InData* in_data, PF_ParamDef* params[], PF_LayerDef* output) {
     if (!output || !params) return PF_Err_BAD_CALLBACK_PARAM;
     if (output->width <= 0 || output->height <= 0) return PF_Err_NONE;
@@ -535,29 +621,48 @@ PF_Err renderFrame(PF_InData* in_data, PF_ParamDef* params[], PF_LayerDef* outpu
         if (request.expressionWeightB > 0) request.expressionPathB = slotPath(kExpressionBIndex, kExpressionB, expressions->paths);
     }
     request.loop = params[kLoop]->u.bd.value != 0;
-    request.width = output->width;
-    request.height = output->height;
-    request.scale = static_cast<float>(params[kScale]->u.fs_d.value / 100.0);
-    const float downX = in_data->downsample_x.den ? static_cast<float>(in_data->downsample_x.num) / in_data->downsample_x.den : 1.0f;
-    const float downY = in_data->downsample_y.den ? static_cast<float>(in_data->downsample_y.num) / in_data->downsample_y.den : 1.0f;
+    // Draw at the layer's full pixel size. A 2x image that is immediately
+    // resampled back into this buffer cannot survive the viewer, so it is not used.
+    const int layerWidth = in_data->width > 0 ? in_data->width : output->width;
+    const int layerHeight = in_data->height > 0 ? in_data->height : output->height;
+    request.width = layerWidth;
+    request.height = layerHeight;
     const float hostPixelAspect = in_data->pixel_aspect_ratio.den
         ? static_cast<float>(in_data->pixel_aspect_ratio.num) / in_data->pixel_aspect_ratio.den : 1.0f;
-    request.pixelAspect = downX > 0 ? hostPixelAspect * downY / downX : hostPixelAspect;
-    request.offsetX = static_cast<float>(params[kOffsetX]->u.fs_d.value) * downX;
-    request.offsetY = static_cast<float>(params[kOffsetY]->u.fs_d.value) * downY;
-    if (!std::isfinite(request.scale) || !std::isfinite(request.pixelAspect) ||
-        !std::isfinite(request.offsetX) || !std::isfinite(request.offsetY)) return PF_Err_BAD_CALLBACK_PARAM;
+    request.pixelAspect = hostPixelAspect;
+    const float userScale = static_cast<float>(params[kScale]->u.fs_d.value / 100.0);
+    const float userOffsetX = static_cast<float>(params[kOffsetX]->u.fs_d.value);
+    const float userOffsetY = static_cast<float>(params[kOffsetY]->u.fs_d.value);
+    if (!std::isfinite(userScale) || !std::isfinite(request.pixelAspect) ||
+        !std::isfinite(userOffsetX) || !std::isfinite(userOffsetY)) return PF_Err_BAD_CALLBACK_PARAM;
+    frameLikePreview(request, characterBounds(request), userScale, userOffsetX, userOffsetY);
 
     if ((err = readLipAudio(in_data, params, request))) return err;
     if ((err = PF_ABORT(in_data))) return err;
     const auto frame = l2dae::render(request);
-    if (frame.width != output->width || frame.height != output->height ||
-        frame.rgba.size() != static_cast<size_t>(output->width) * output->height * 4)
+    if (frame.width != request.width || frame.height != request.height ||
+        frame.rgba.size() != static_cast<size_t>(request.width) * request.height * 4)
         throw std::runtime_error("Live2D renderer returned an invalid frame size.");
     if ((err = PF_ABORT(in_data))) return err;
+    std::vector<std::uint8_t> fitted;
+    const std::uint8_t* sourcePixels = frame.rgba.data();
+    if (frame.width != output->width || frame.height != output->height) {
+        fitted.resize(static_cast<size_t>(output->width) * output->height * 4);
+        for (A_long y = 0; y != output->height; ++y) {
+            const int sourceY = std::min(frame.height - 1, static_cast<int>(
+                (static_cast<long long>(y) * frame.height + frame.height / 2) / output->height));
+            for (A_long x = 0; x != output->width; ++x) {
+                const int sourceX = std::min(frame.width - 1, static_cast<int>(
+                    (static_cast<long long>(x) * frame.width + frame.width / 2) / output->width));
+                const auto* sample = frame.rgba.data() + (static_cast<size_t>(sourceY) * frame.width + sourceX) * 4;
+                std::memcpy(fitted.data() + (static_cast<size_t>(y) * output->width + x) * 4, sample, 4);
+            }
+        }
+        sourcePixels = fitted.data();
+    }
     for (A_long y = 0; y != output->height; ++y) {
         if ((y & 63) == 0 && (err = PF_ABORT(in_data))) return err;
-        const auto* source = frame.rgba.data() + static_cast<size_t>(y) * output->width * 4;
+        const auto* source = sourcePixels + static_cast<size_t>(y) * output->width * 4;
         auto* destination = reinterpret_cast<unsigned char*>(output->data) + static_cast<ptrdiff_t>(y) * output->rowbytes;
         if (deep) {
             auto* pixels = reinterpret_cast<PF_Pixel16*>(destination);

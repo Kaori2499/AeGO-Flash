@@ -213,7 +213,7 @@ function host() {
   const comp = new CompItem(), model = comp.model(100), effect = model.effects[0];
   const project = {items: [comp], get numItems() { return this.items.length; }, item(i) { return this.items[i - 1]; }};
   comp.project = project; model.selected = true;
-  const app = {project, depth: 0, undoGroups: 0,
+  const app = {project, isoLanguage: 'zh_CN', depth: 0, undoGroups: 0,
     beginUndoGroup() { this.depth++; this.undoGroups++; }, endUndoGroup() { this.depth--; }};
   const context = vm.createContext({app, CompItem, MarkerValue});
   vm.runInContext(source, context, {filename: 'TimelineClips.jsx'});
@@ -311,6 +311,21 @@ function snapshot(comp) {
   clockResult(evaluate(h.effect, h.comp, 16.5), [1, 1, 2.5, 2.5, 0]);
   for (const l of tagged(h.comp, 101)) l.remove();
   clockResult(evaluate(h.effect, h.comp, 3), [1, 1, 0, 0, 0]);
+}
+
+// After Effects reports sourceTime 0 at and beyond the out point. The hold
+// must stay on the motion's last frame instead of snapping back to its start.
+{
+  const h = host(); h.add(payload());
+  const a = tagged(h.comp, 100)[0];
+  const linear = time => (time - a.startTime) * 100 / a.stretch;
+  a.sourceTime = time => (time < a.inPoint || time >= a.outPoint) ? 0 : linear(time);
+  clockResult(evaluate(h.effect, h.comp, 2), [1, 1, 2, 2, 0]);
+  clockResult(evaluate(h.effect, h.comp, 4), [1, 1, 4, 4, 0]);
+  clockResult(evaluate(h.effect, h.comp, 10), [1, 1, 4, 4, 0]);
+  a.stretch = 200; a.outPoint = 8;
+  clockResult(evaluate(h.effect, h.comp, 8), [1, 1, 4, 4, 0]);
+  clockResult(evaluate(h.effect, h.comp, 7.9), [1, 1, linear(7.9), linear(7.9), 0]);
 }
 
 // Native positive/negative stretch and reversed in/out points.

@@ -726,6 +726,7 @@ public:
         if (!renderer) throw std::runtime_error("Cannot create the Cubism D3D11 renderer.");
         renderer->IsPremultipliedAlpha(false); // WIC uploaded straight alpha; Cubism outputs premultiplied alpha.
         renderer->UseHighPrecisionMask(true);
+        renderer->SetAnisotropy(8.0f);
         const int count = settings_->GetTextureCount();
         if (count <= 0) throw std::runtime_error("model3.json has no textures.");
         for (int i = 0; i < count; ++i) {
